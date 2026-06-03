@@ -10,7 +10,7 @@ _OpenRGB plugin for the NZXT Kraken Z / Elite LCD screen._
 
 Drive the circular LCD of **NZXT Kraken Z / Elite** coolers straight from
 [OpenRGB](https://openrgb.org) — system stats, clock faces, an audio
-visualizer, a *Now Playing* widget and custom image/GIF backgrounds — **without
+visualizer, a *playing* widget and custom image/GIF backgrounds — **without
 NZXT CAM**.
 
 > **Windows-only.** The screen channel relies on a WinUSB transport and the

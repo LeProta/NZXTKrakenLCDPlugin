@@ -22,6 +22,7 @@ NZXT CAM**.
 
 - [Features](#features)
 - [Supported devices](#supported-devices)
+- [Download](#download)
 - [Requirements](#requirements)
 - [Setup (required to make it work)](#setup-required-to-make-it-work)
 - [Building from source](#building-from-source)
@@ -71,6 +72,14 @@ Additional capabilities:
 > Primary development and testing target: **Kraken Elite V2 (`0x3012`)**. Older
 > models share the same protocol but are less extensively tested.
 
+## Download
+
+Download the latest **`NZXTKrakenLCDPlugin.dll`** from the
+[Releases](https://github.com/LeProtagoniste/NZXTKrakenLCDPlugin/releases) page,
+or [build it from source](#building-from-source). In both cases, complete the
+[required setup](#setup-required-to-make-it-work) (Zadig + `lhwm-wrapper.dll`)
+before first use.
+
 ## Requirements
 
 ### Runtime
@@ -79,7 +88,7 @@ Additional capabilities:
 |-----------|------------------|-----------------|
 | **OpenRGB** | Host application that loads the plugin | <https://openrgb.org> · [GitLab](https://gitlab.com/CalcProgrammer1/OpenRGB) |
 | **WinUSB driver** on the Kraken LCD interface | Lets the plugin claim the bulk LCD channel | Installed with [Zadig](https://zadig.akeo.ie) (see [Setup](#setup-required-to-make-it-work)) |
-| **`lhwm-wrapper.dll`** next to `OpenRGB.exe` | .NET bridge to LibreHardwareMonitor (system sensors) | Bundled with releases / `third_party/lhwm-cpp-wrapper/` |
+| **`lhwm-wrapper.dll`** next to `OpenRGB.exe` | .NET bridge to LibreHardwareMonitor (system sensors) | [Direct download](https://gitlab.com/OpenRGBDevelopers/OpenRGBHardwareSyncPlugin/-/raw/master/dependencies/lhwm-cpp-wrapper/x64/Release/lhwm-wrapper.dll) |
 | **Administrator rights** for OpenRGB | Required to read CPU / motherboard temperatures (ring-0 sensor driver) | — |
 
 ### Build
@@ -115,9 +124,10 @@ driver on it:
 
 System sensors (CPU/GPU/RAM) are read through an embedded build of
 [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor).
-Its managed assembly **`lhwm-wrapper.dll`** must sit in the **same folder as
-`OpenRGB.exe`**. If it is missing, the plugin loads but its panel is disabled
-with a *"Cannot load the plugin"* message.
+Download **[`lhwm-wrapper.dll`](https://gitlab.com/OpenRGBDevelopers/OpenRGBHardwareSyncPlugin/-/raw/master/dependencies/lhwm-cpp-wrapper/x64/Release/lhwm-wrapper.dll)**
+(the same assembly shipped with the OpenRGB *Hardware Sync* plugin) and place it
+in the **same folder as `OpenRGB.exe`**. If it is missing, the plugin loads but
+its panel is disabled with a *"Cannot load the plugin"* message.
 
 ### 3. Run OpenRGB as Administrator
 
@@ -130,13 +140,14 @@ Liquid temperature, pump/fan RPM and GPU sensors work without it.
 
 ### 4. Install the plugin
 
-Copy the built DLL into the OpenRGB plugins folder and restart OpenRGB:
+In OpenRGB, open **Settings → Plugins**, click **Install plugin** and select
+`NZXTKrakenLCDPlugin.dll`. Alternatively, drop the file straight into the plugins folder:
 
 ```
 %APPDATA%\OpenRGB\plugins\NZXTKrakenLCDPlugin.dll
 ```
 
-A **"NZXT Kraken LCD"** tab then appears in OpenRGB.
+Restart OpenRGB — a **"NZXT Kraken LCD"** tab then appears.
 
 ## Building from source
 
@@ -210,7 +221,7 @@ Logs are written next to OpenRGB's log files
 
 - [OpenRGB](https://gitlab.com/CalcProgrammer1/OpenRGB) — host application and plugin SDK.
 - [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) — system sensor backend (MPL-2.0).
-- `lhwm-cpp-wrapper` — native C++/CLI bridge to LibreHardwareMonitor (bundled in `third_party/`).
+- `lhwm-cpp-wrapper` — the C++/CLI wrapper over LibreHardwareMonitor that produces `lhwm-wrapper.dll`. A prebuilt copy ships with the [OpenRGB Hardware Sync plugin](https://gitlab.com/OpenRGBDevelopers/OpenRGBHardwareSyncPlugin).
 - [liquidctl](https://github.com/liquidctl/liquidctl) and the wider community for Kraken protocol research.
 - [Zadig](https://zadig.akeo.ie) — WinUSB driver installation.
 

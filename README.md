@@ -152,7 +152,7 @@ In OpenRGB, open **Settings → Plugins**, click **Install plugin** and select
 `NZXTKrakenLCDPlugin.dll`. Alternatively, drop the file straight into the plugins folder:
 
 ```
-%APPDATA%\OpenRGB\plugins\NZXTKrakenLCDPlugin.dll
+%APPDATA%\OpenRGB\plugins
 ```
 
 Restart OpenRGB — a **"NZXT Kraken LCD"** tab then appears.

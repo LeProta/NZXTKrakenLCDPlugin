@@ -33,7 +33,6 @@ NZXT CAM**.
 - [How it works](#how-it-works)
 - [Acknowledgements](#acknowledgements)
 - [License](#license)
-- [Related projects](#related-projects)
 
 ---
 
@@ -239,10 +238,3 @@ Released under the **MIT License** — see [`LICENSE`](LICENSE).
 
 Third-party components (LibreHardwareMonitor, Qt, hidapi, libusb, …) remain under
 their respective licenses.
-
-## Related projects
-
-- [OpenRGB](https://gitlab.com/CalcProgrammer1/OpenRGB) — the RGB control suite this plugin extends.
-- [OpenRGB Hardware Sync plugin](https://gitlab.com/OpenRGBDevelopers/OpenRGBHardwareSyncPlugin) — drives ARGB devices from hardware sensors; shares the `lhwm-wrapper.dll` backend.
-- [liquidctl](https://github.com/liquidctl/liquidctl) — cross-platform CLI to control NZXT Kraken and many other coolers (fans, pump, lighting).
-- [CoolerControl](https://gitlab.com/coolercontrol/coolercontrol) — GUI to monitor and control cooling devices.

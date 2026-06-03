@@ -1,0 +1,20 @@
+# NZXT Kraken LCD — règles udev
+# Permet l'accès USB sans root sur Linux
+# Copier dans /etc/udev/rules.d/60-nzxt-kraken-lcd.rules
+# Puis : sudo udevadm control --reload-rules && sudo udevadm trigger
+
+# Kraken Z53
+SUBSYSTEM=="usb", ATTR{idVendor}=="1e71", ATTR{idProduct}=="3009", MODE="0666", GROUP="plugdev", TAG+="uaccess"
+# Kraken Z63
+SUBSYSTEM=="usb", ATTR{idVendor}=="1e71", ATTR{idProduct}=="300a", MODE="0666", GROUP="plugdev", TAG+="uaccess"
+# Kraken Z73
+SUBSYSTEM=="usb", ATTR{idVendor}=="1e71", ATTR{idProduct}=="3008", MODE="0666", GROUP="plugdev", TAG+="uaccess"
+# Kraken Elite 360
+SUBSYSTEM=="usb", ATTR{idVendor}=="1e71", ATTR{idProduct}=="300c", MODE="0666", GROUP="plugdev", TAG+="uaccess"
+# Kraken 2023
+SUBSYSTEM=="usb", ATTR{idVendor}=="1e71", ATTR{idProduct}=="300e", MODE="0666", GROUP="plugdev", TAG+="uaccess"
+# Kraken Elite V2 (2024)
+SUBSYSTEM=="usb", ATTR{idVendor}=="1e71", ATTR{idProduct}=="3012", MODE="0666", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1e71", ATTR{idProduct}=="3013", MODE="0666", GROUP="plugdev", TAG+="uaccess"
+# HID nodes
+KERNEL=="hidraw*", ATTRS{idVendor}=="1e71", MODE="0666", GROUP="plugdev", TAG+="uaccess"

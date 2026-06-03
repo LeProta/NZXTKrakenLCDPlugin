@@ -1,5 +1,7 @@
 # NZXT Kraken LCD — OpenRGB Plugin
 
+_OpenRGB plugin for the NZXT Kraken Z / Elite LCD screen._
+
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20(x64)-0078D6)
 ![Qt](https://img.shields.io/badge/Qt-5.15-41CD52)
 ![OpenRGB](https://img.shields.io/badge/OpenRGB-plugin-CC1010)
@@ -31,6 +33,7 @@ NZXT CAM**.
 - [How it works](#how-it-works)
 - [Acknowledgements](#acknowledgements)
 - [License](#license)
+- [Related projects](#related-projects)
 
 ---
 
@@ -74,11 +77,16 @@ Additional capabilities:
 
 ## Download
 
-Download the latest **`NZXTKrakenLCDPlugin.dll`** from the
-[Releases](https://github.com/LeProtagoniste/NZXTKrakenLCDPlugin/releases) page,
-or [build it from source](#building-from-source). In both cases, complete the
-[required setup](#setup-required-to-make-it-work) (Zadig + `lhwm-wrapper.dll`)
-before first use.
+Prebuilt **`NZXTKrakenLCDPlugin.dll`** binaries are published on the
+[Releases](https://github.com/LeProtagoniste/NZXTKrakenLCDPlugin/releases) page
+for convenience. They are compiled directly from the source in this repository —
+and because the full source is available, you can [build it yourself](#building-from-source)
+and verify the result rather than trusting the binary. The only external binary is
+`lhwm-wrapper.dll`, taken as-is from the official
+[OpenRGB Hardware Sync plugin](https://gitlab.com/OpenRGBDevelopers/OpenRGBHardwareSyncPlugin).
+
+Either way, complete the [required setup](#setup-required-to-make-it-work)
+(Zadig + `lhwm-wrapper.dll`) before first use.
 
 ## Requirements
 
@@ -231,3 +239,10 @@ Released under the **MIT License** — see [`LICENSE`](LICENSE).
 
 Third-party components (LibreHardwareMonitor, Qt, hidapi, libusb, …) remain under
 their respective licenses.
+
+## Related projects
+
+- [OpenRGB](https://gitlab.com/CalcProgrammer1/OpenRGB) — the RGB control suite this plugin extends.
+- [OpenRGB Hardware Sync plugin](https://gitlab.com/OpenRGBDevelopers/OpenRGBHardwareSyncPlugin) — drives ARGB devices from hardware sensors; shares the `lhwm-wrapper.dll` backend.
+- [liquidctl](https://github.com/liquidctl/liquidctl) — cross-platform CLI to control NZXT Kraken and many other coolers (fans, pump, lighting).
+- [CoolerControl](https://gitlab.com/coolercontrol/coolercontrol) — GUI to monitor and control cooling devices.

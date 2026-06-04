@@ -67,7 +67,7 @@ Download the prebuilt **`NZXTKrakenLCDPlugin.dll`** from the [Releases](https://
 
 System sensors are read through [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) via this bridge DLL.
 
-**[Download `lhwm-wrapper.dll`](https://gitlab.com/OpenRGBDevelopers/OpenRGBHardwareSyncPlugin/-/raw/master/dependencies/lhwm-cpp-wrapper/x64/Release/lhwm-wrapper.dll)** (from the OpenRGB Hardware Sync plugin) and place it in the **same folder as `OpenRGB.exe`**. Without it, the plugin loads but shows *"Cannot load the plugin"*.
+**[Download](https://gitlab.com/OpenRGBDevelopers/OpenRGBHardwareSyncPlugin/-/raw/master/dependencies/lhwm-cpp-wrapper/x64/Release/lhwm-wrapper.dll) `lhwm-wrapper.dll`** (from the OpenRGB Hardware Sync plugin) and place it in the **same folder as `OpenRGB.exe`**. Without it, the plugin loads but shows *"Cannot load the plugin"*.
 
 ### 3. Install the plugin
 

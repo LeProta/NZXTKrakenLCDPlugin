@@ -61,7 +61,7 @@ All devices share VID `0x1E71`. Primary development target: **Kraken Elite V2 (`
 
 ### 1. Get the plugin
 
-Download the prebuilt **`NZXTKrakenLCDPlugin.dll`** from the [Releases](https://github.com/LeProtagoniste/NZXTKrakenLCDPlugin/releases) page, or [build it yourself](#building-from-source).
+Download the prebuilt **`NZXTKrakenLCDPlugin.dll`** from the [Releases](https://github.com/LeProta/NZXTKrakenLCDPlugin/releases) page, or [build it yourself](#building-from-source).
 
 ### 2. Place `lhwm-wrapper.dll` next to `OpenRGB.exe`
 

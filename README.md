@@ -16,19 +16,28 @@ Drive the circular LCD of **NZXT Kraken Z / Elite** coolers straight from [OpenR
 
 ## Features
 
+### Display modes
+
 | Mode | Description |
 |------|-------------|
-| **Image / GIF** | Custom still image or animated GIF (JPG / PNG / GIF) |
-| **Single Infographic** | One sensor with a gradient gauge arc (optional GIF background) |
-| **Dual Infographic** | Two sensors (e.g. CPU + GPU), vertical arcs or horizontal bars |
-| **Triple Infographic** | One primary + two secondary sensors |
-| **Clockface** | Three styles — analog dots, gradient arc, digital |
-| **Audio Visualizer** | Real-time WASAPI loopback visualizer with adjustable sensitivity |
-| **Now Playing** | Media title / artist / cover / progress via Windows SMTC |
+| **Image / GIF** | Show any still image or animated GIF (JPG / PNG / GIF) as a full-screen background. |
+| **Single Infographic** | One sensor value with a gradient gauge arc. Accepts an optional animated GIF background. |
+| **Dual Infographic** | Two sensors side by side (e.g. CPU + GPU) displayed as vertical arcs or horizontal bars, with optional GIF background. |
+| **Triple Infographic** | One primary sensor with two smaller secondary values — useful for combining temperature, load and clock at a glance. Optional GIF background. |
+| **Clockface** | A live clock in three styles: analog dots, gradient arc, or large digital readout. |
+| **Audio Visualizer** | Real-time frequency bars driven by WASAPI loopback capture (system audio). Sensitivity is adjustable. |
+| **Now Playing** | Pulls the current track title, artist, album art and playback progress from Windows SMTC — works with Spotify, browsers and any SMTC-aware app. |
 
-**Sensors:** CPU/GPU temperature, load & clock · RAM load · coolant temperature · pump & fan RPM.
+### Available sensors
 
-**Other:** per-mode colors & gradients · logo toggle · °C/°F · brightness & rotation · refresh driven by the panel (30 Hz Z-series, 60 Hz Elite).
+CPU temperature · CPU load · CPU clock · GPU temperature · GPU load · RAM load · Coolant (liquid) temperature · Pump RPM · Fan RPM
+
+### General
+
+- Per-mode color and gradient customisation, with an independent logo toggle.
+- °C / °F follows the OpenRGB locale setting.
+- Brightness and rotation controls.
+- Refresh rate is driven by the panel: ~5 Hz for static screens, full panel rate (30 or 60 Hz) for animated modes.
 
 ---
 

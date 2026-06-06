@@ -51,21 +51,13 @@ static const QList<SensorOption> MEMORY_SENSORS = {
 // =============================================================================
 //  SystemSensors
 //  ---------------------------------------------------------------------------
-//  Windows : lecture via LibreHardwareMonitor embarqué (lhwm-cpp-wrapper.lib,
-//  lib statique + lhwm-wrapper.dll, l'assembly .NET à placer à côté
-//  d'OpenRGB.exe). Aucun OHM/LHM externe requis.
-//    - startPolling() appelle buildSensorMap() : LHWM::GetHardwareSensorMap()
-//      est récupérée UNE fois, puis chaque capteur est résolu automatiquement
-//      par préfixe d'identifiant (/amdcpu/ /intelcpu/ → CPU ; /gpu-amd/
-//      /gpu-nvidia/ /gpu-intel/ → GPU ; /ram/ → RAM) + type (Temperature /
-//      Load / Clock) + préférence de nom. Le résultat est l'identifiant exact.
+//  Windows : lecture via LibreHardwareMonitor embarqué (lhwm-cpp-wrapper.lib, lib statique + lhwm-wrapper.dll, l'assembly .NET à placer à côté d'OpenRGB.exe). Aucun OHM/LHM externe requis.
+//    - startPolling() appelle buildSensorMap() : LHWM::GetHardwareSensorMap() est récupérée UNE fois, puis chaque capteur est résolu automatiquement par préfixe d'identifiant (/amdcpu/ /intelcpu/ → CPU ; /gpu-amd/ /gpu-nvidia/ /gpu-intel/ → GPU ; /ram/ → RAM) + type (Temperature / Load / Clock) + préférence de nom. Le résultat est l'identifiant exact.
 //    - pollOnce() lit chaque valeur via LHWM::GetSensorValue(identifiant).
 //    - Capteur non résolu ou introuvable → SensorValue.available = false → "N/A".
 //  La température du liquide vient du Kraken (HID, via setLiquidTemp), pas de LHM.
 //
-//  Pré-requis : lhwm-wrapper.dll présent (vérifié en amont par le plugin) et,
-//  pour les capteurs CPU / carte mère, OpenRGB lancé en administrateur (driver
-//  ring0 de LHM). Toute erreur → available = false. Jamais de crash.
+//  Pré-requis : lhwm-wrapper.dll présent (vérifié en amont par le plugin) et pour les capteurs CPU / carte mère, OpenRGB lancé en administrateur (driver ring0 de LHM). Toute erreur → available = false. Jamais de crash.
 // =============================================================================
 class SystemSensors {
 public:

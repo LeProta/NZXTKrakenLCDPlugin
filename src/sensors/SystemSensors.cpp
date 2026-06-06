@@ -1,11 +1,7 @@
 // =============================================================================
 //  SystemSensors.cpp — Acquisition des capteurs systeme (Windows uniquement)
 //
-//  LibreHardwareMonitor embarque via lhwm-cpp-wrapper (lib statique) +
-//  lhwm-wrapper.dll (assembly .NET, a placer a cote d'OpenRGB.exe). Aucun
-//  OHM/LHM externe. Mapping AUTOMATIQUE par prefixe d'identifiant + type +
-//  preference de nom (cf. buildSensorMap()). Liquide : fourni par le Kraken
-//  via HID (setLiquidTemp).
+//  LibreHardwareMonitor embarque via lhwm-cpp-wrapper (lib statique) + lhwm-wrapper.dll (assembly .NET, a placer a cote d'OpenRGB.exe). Aucun OHM/LHM externe. Mapping AUTOMATIQUE par prefixe d'identifiant + type + preference de nom (cf. buildSensorMap()). Liquide : fourni par le Kraken via HID (setLiquidTemp).
 //
 //  Regle absolue : aucun crash. Toute erreur -> SensorValue.available = false.
 // =============================================================================
@@ -132,9 +128,7 @@ void SystemSensors::buildSensorMap()
         return;
     }
 
-    // Selecteur : parmi les entrees (categorie + type), prend la 1re dont le nom
-    // correspond a une preference (egalite exacte puis prefixe), sinon la 1re ;
-    // en excluant les noms contenant un motif d'exclusion.
+    // Selecteur : parmi les entrees (categorie + type), prend la 1re dont le nom correspond a une preference (egalite exacte puis prefixe), sinon la 1re ; en excluant les noms contenant un motif d'exclusion.
     auto pick = [&](bool(*cat)(const std::string&), const char* type,
                     std::initializer_list<const char*> prefs,
                     std::initializer_list<const char*> excludes) -> std::string {

@@ -6,8 +6,7 @@ namespace NZXTKraken {
 // Gère le dossier médias :
 //   %APPDATA%/OpenRGB/NZXTKrakenLCD/media
 //
-// Copie les fichiers uploadés dedans et fournit le chemin racine
-// pour le bouton "Browse".
+// Copie les fichiers uploadés dedans et fournit le chemin racine pour le bouton "Browse".
 class KrakenMediaCache {
 public:
     // Retourne le dossier racine "media" (le crée s'il n'existe pas)

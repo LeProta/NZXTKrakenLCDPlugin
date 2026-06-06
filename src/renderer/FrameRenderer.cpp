@@ -88,9 +88,7 @@ static void drawClockArcBrush(QPainter& p, const QRectF& rect,
 enum class UnitKind  { Temp, Load, ClockMHz, ClockGHz, None };
 enum class TextAlign { Start, Middle, End };
 
-// Unité de température : écrite depuis l'UI (LanguageChange), lue au rendu
-// (thread worker) -> atomic. L'arc/jauge reste sur la valeur brute en °C ;
-// seul le NOMBRE affiché est converti.
+// Unité de température : écrite depuis l'UI (LanguageChange), lue au rendu (thread worker) -> atomic. L'arc/jauge reste sur la valeur brute en °C ; seul le NOMBRE affiché est converti.
 static std::atomic<bool> g_fahrenheit{false};
 
 static inline float maybeToFahrenheit(float v, SensorType t)
@@ -183,10 +181,7 @@ static qint64 animNowMs()
 }
 
 // ─── Texte défilant en va-et-vient (marquee bidirectionnel) ──────────────────
-// Si le texte tient dans viewportW → centré (statique). Sinon : pause au début
-// (1er mot visible), défilement jusqu'au dernier mot, pause, retour au 1er mot,
-// puis la boucle recommence. Le rendu est découpé (clip) à la fenêtre visible
-// pour ne jamais déborder du cercle. elapsedMs = temps écoulé depuis l'ancre.
+// Si le texte tient dans viewportW → centré (statique). Sinon : pause au début (1er mot visible), défilement jusqu'au dernier mot, pause, retour au 1er mot, puis la boucle recommence. Le rendu est découpé (clip) à la fenêtre visible pour ne jamais déborder du cercle. elapsedMs = temps écoulé depuis l'ancre.
 static void drawScrollingText(QPainter& p, qreal cx, qreal centerY, qreal bandH,
                               qreal viewportW, const QString& text, const QFont& font,
                               const QColor& fill, const QColor& outline, qint64 elapsedMs)
@@ -233,8 +228,7 @@ static void drawScrollingText(QPainter& p, qreal cx, qreal centerY, qreal bandH,
 }
 
 // ─── Dessin valeur + unité, version étendue (fill + outline) ─────────────────
-// Si forceShowUnit == false, l'unité est masquée — utile quand le capteur
-// n'a pas encore chargé (valeur "--") pour éviter d'afficher "% / °C / GHz".
+// Si forceShowUnit == false, l'unité est masquée — utile quand le capteur n'a pas encore chargé (valeur "--") pour éviter d'afficher "% / °C / GHz".
 static void drawMetric(QPainter& p, qreal x, qreal y,
                        const QString& numStr,
                        int numPx, int unitPx,
@@ -326,8 +320,7 @@ FrameRenderer::FrameRenderer(SystemSensors* sensors) : m_sensors(sensors)
 FrameRenderer::~FrameRenderer() = default;
 
 // Helper : retourne le ModeConfig actif pour les modes infographic.
-// Pour les autres modes (Image/GIF, Clock, Audio), retourne single par défaut
-// (mais ces modes utilisent cfg.bgColor explicitement, pas activeMode).
+// Pour les autres modes (Image/GIF, Clock, Audio), retourne single par défaut (mais ces modes utilisent cfg.bgColor explicitement, pas activeMode).
 const ModeConfig& FrameRenderer::activeMode(const FrameConfig& cfg)
 {
     switch (cfg.mode) {
@@ -366,10 +359,7 @@ QImage FrameRenderer::render(const FrameConfig& cfg)
     const QImage* staticImg = nullptr;
 
     if (usesMedia && !mediaPath.isEmpty()) {
-        // Resolution media memoisee tant que le chemin ne change pas : evite une
-        // std::string + des lookups map a chaque frame (le chemin ne change qu'au
-        // choix d'un fichier). m_gifCache/m_imageCache restent proprietaires ; on
-        // ne garde qu'un pointeur (stable car std::map ne deplace pas ses noeuds).
+        // Resolution media memoisee tant que le chemin ne change pas : evite une std::string + des lookups map a chaque frame (le chemin ne change qu'au choix d'un fichier). m_gifCache/m_imageCache restent proprietaires ; on ne garde qu'un pointeur (stable car std::map ne deplace pas ses noeuds).
         if (mediaPath != m_lastMediaPath) {
             m_lastMediaPath = mediaPath;
             m_lastGif       = nullptr;
@@ -450,11 +440,7 @@ QByteArray FrameRenderer::toJpeg(const QImage& img, int quality)
 
 QByteArray FrameRenderer::toQ565(const QImage& img)
 {
-    // Buffer reutilise d'une frame a l'autre (toQ565 n'est appele que depuis le
-    // thread worker, sequentiellement) : evite une alloc/free de ~2 Mio par frame.
-    // Q565_Encoder::encode fait resize(0) puis append -> la capacite est conservee.
-    // Le retour partage le buffer en COW ; la frame precedente est detruite avant
-    // le prochain appel, donc le resize(0) reste en place (refcount 1, pas de detach).
+    // Buffer reutilise d'une frame a l'autre (toQ565 n'est appele que depuis le thread worker, sequentiellement) : evite une alloc/free de ~2 Mio par frame. Q565_Encoder::encode fait resize(0) puis append -> la capacite est conservee. Le retour partage le buffer en COW ; la frame precedente est detruite avant le prochain appel, donc le resize(0) reste en place (refcount 1, pas de detach).
     thread_local QByteArray out;
     if (out.capacity() < (1 << 21))
         out.reserve(1 << 21);   // ~2 MiB, superieur au pire cas (une seule fois)
@@ -476,8 +462,7 @@ void FrameRenderer::setMediaInfo(const MediaSnapshot& snap)
 }
 
 // ─── Fond ────────────────────────────────────────────────────────────────────
-// Le fond utilise le ModeConfig actif pour les modes infographic, et cfg.bgColor
-// pour les autres (Image/GIF, Clock, Audio).
+// Le fond utilise le ModeConfig actif pour les modes infographic, et cfg.bgColor pour les autres (Image/GIF, Clock, Audio).
 void FrameRenderer::renderBackground(QPainter& p, const FrameConfig& cfg,
                                      QMovie* gif, const QImage* staticImg)
 {
@@ -624,8 +609,7 @@ void FrameRenderer::renderSingleInfographic(QPainter& p, const FrameConfig& cfg)
     // 2. Si le capteur est disponible, on applique strictement l'écart constant (10°).
     float currentGap = sv.available ? ARC_GAP_DEG : 0.f;
 
-    // Dessin du fond : même dégradé que la jauge mais assombri (effet de
-    // voile) pour matérialiser visuellement la zone non remplie.
+    // Dessin du fond : même dégradé que la jauge mais assombri (effet de voile) pour matérialiser visuellement la zone non remplie.
     GradientStops bgStops = createDarkenedStops(stops);
     QConicalGradient bgGrad = makeArcConicalGradient(QPointF(cx, cy), bgStops,
                                                      ARC_START, ARC_SWEEP);
@@ -634,8 +618,7 @@ void FrameRenderer::renderSingleInfographic(QPainter& p, const FrameConfig& cfg)
 
     // Dessin de la jauge et de la boule (uniquement s'il y a une valeur lisible)
     if (sv.available) {
-        // La jauge colorée s'arrête 10° AVANT la valeur, 
-        // pour laisser la boule isolée au milieu de son espace !
+        // La jauge colorée s'arrête 10° AVANT la valeur, pour laisser la boule isolée au milieu de son espace !
         drawClockArcBrush(p, arcRect, ARC_START, valAngle - ARC_GAP_DEG, QBrush(grad), thick);
 
         // La boule est dessinée à sa position exacte et redevient visible
@@ -732,8 +715,7 @@ void FrameRenderer::renderDualInfographic(QPainter& p, const FrameConfig& cfg)
         const qreal valueY = blockY - LCD_R * 0.03;
         const qreal labelY = blockY + LCD_R * 0.27;   // un peu plus d'air que 0.24, sans trop ecarter
 
-        // L'unité MHz est toujours masquée pour les clocks (affichage trop large).
-        // Autres unités : seulement si le capteur a une valeur lisible.
+        // L'unité MHz est toujours masquée pour les clocks (affichage trop large). Autres unités : seulement si le capteur a une valeur lisible.
         const bool showU1 = sv1.available && (u1 != UnitKind::ClockMHz);
         const bool showU2 = sv2.available && (u2 != UnitKind::ClockMHz);
 
@@ -862,8 +844,7 @@ void FrameRenderer::renderTripleInfographic(QPainter& p, const FrameConfig& cfg)
     // ─── CORRECTION DU GAP ET DE LA BARRE (TRIPLE) ───────────────────────────
     float currentGap = svM.available ? ARC_GAP_DEG : 0.f;
 
-    // Fond : même dégradé que la barre mais assombri (effet de voile)
-    // pour matérialiser visuellement la zone non remplie.
+    // Fond : même dégradé que la barre mais assombri (effet de voile) pour matérialiser visuellement la zone non remplie.
     GradientStops bgStops = createDarkenedStops(stops);
     QConicalGradient bgGrad = makeArcConicalGradient(QPointF(cx, cy), bgStops,
                                                      ARC_START, ARC_SWEEP);
@@ -881,16 +862,14 @@ void FrameRenderer::renderTripleInfographic(QPainter& p, const FrameConfig& cfg)
     }
 
     // ─── Tailles de police ───────────────────────────────────────────────
-    // Le nombre primaire ET les nombres secondaires retrecissent selon leur
-    // nombre de chiffres ; les labels gardent leur taille fixe.
+    // Le nombre primaire ET les nombres secondaires retrecissent selon leur nombre de chiffres ; les labels gardent leur taille fixe.
     const int mLen = numM.length();
     int mFont, mDeg;
     if (mLen >= 4)      { mFont = int(LCD_R * 0.38); mDeg = int(LCD_R * 0.09); }
     else if (mLen == 3) { mFont = int(LCD_R * 0.48); mDeg = int(LCD_R * 0.11); }
     else                { mFont = int(LCD_R * 0.60); mDeg = int(LCD_R * 0.135); }
 
-    // Secondaire/tertiaire : meme logique que le primaire (le chiffre diminue
-    // avec sa longueur), label fixe et chiffre aligne a gauche (TextAlign::Start).
+    // Secondaire/tertiaire : meme logique que le primaire (le chiffre diminue avec sa longueur), label fixe et chiffre aligne a gauche (TextAlign::Start).
     auto secSize = [](const QString& s) -> std::pair<int,int> {
         const int len = s.length();
         if (len >= 4) return { int(LCD_R * 0.16), int(LCD_R * 0.05)  };
@@ -906,8 +885,7 @@ void FrameRenderer::renderTripleInfographic(QPainter& p, const FrameConfig& cfg)
     const bool showUB = svB.available && (uB != UnitKind::ClockMHz);
 
     // ─── Recentrage horizontal du bloc (primaire | separateur | secondaires) ─
-    // On mesure la largeur reellement dessinee de chaque element puis on decale
-    // tout le bloc pour que son milieu tombe sur cx (l'arc reste centre).
+    // On mesure la largeur reellement dessinee de chaque element puis on decale tout le bloc pour que son milieu tombe sur cx (l'arc reste centre).
     auto metricW = [](const QString& num, int numPx, int unitPx,
                       UnitKind unit, bool showUnit) -> qreal {
         qreal w = QFontMetricsF(nzxtFont(numPx)).horizontalAdvance(num);
@@ -1004,8 +982,7 @@ void FrameRenderer::renderClock(QPainter& p, const FrameConfig& cfg)
     const QPointF center(LCD_W / 2.0, LCD_H / 2.0);
 
     // ═══ STYLE 1 — ARC DÉGRADÉ ═══════════════════════════════════════
-    // Le dégradé conique remplit tout l'écran : il démarre devant l'aiguille
-    // (heures), fait le tour (360°) et se termine derrière (couture sur l'aiguille).
+    // Le dégradé conique remplit tout l'écran : il démarre devant l'aiguille (heures), fait le tour (360°) et se termine derrière (couture sur l'aiguille).
     if (cfg.clockStyle == 1) {
         const qreal R = LCD_R * 0.985;
         const float handClock = hourFrac * 30.f;          // tour complet en 12 h
@@ -1036,8 +1013,7 @@ void FrameRenderer::renderClock(QPainter& p, const FrameConfig& cfg)
         const QString hh = QStringLiteral("%1").arg(hr, 2, 10, QChar('0'));
         const QString mm = QStringLiteral("%1").arg(now.minute(), 2, 10, QChar('0'));
 
-        // Texte fixe sur la droite : centré horizontalement entre le centre de
-        // l'horloge et le bord droit, et centré verticalement.
+        // Texte fixe sur la droite : centré horizontalement entre le centre de l'horloge et le bord droit, et centré verticalement.
         const qreal ax = center.x() + R * 0.5;
         const qreal ay = center.y();
         const int hPx = int(LCD_R * 0.28), mPx = int(LCD_R * 0.24);
@@ -1120,8 +1096,7 @@ void FrameRenderer::renderClock(QPainter& p, const FrameConfig& cfg)
 // AUDIO VISUAL
 // ═════════════════════════════════════════════════════════════════════════════
 // Contour POLYGONAL reliant les sommets par des segments droits.
-// (Mode connecté — volontairement très peu arrondi : on relie directement les
-// pics, ce qui donne une forme anguleuse / dentelée plutôt qu'un blob lisse.)
+// (Mode connecté — volontairement très peu arrondi : on relie directement les pics, ce qui donne une forme anguleuse / dentelée plutôt qu'un blob lisse.)
 static QPainterPath nzxtPolygonClosedPath(const QList<QPointF>& pts)
 {
     QPainterPath path;
@@ -1164,8 +1139,7 @@ void FrameRenderer::renderAudioVisual(QPainter& p, const FrameConfig& cfg)
     const float meanAmp = (N > 0) ? sum / float(N) : 0.f;
     const float level   = std::clamp(meanAmp * 0.55f + peak * 0.45f, 0.f, 1.f);
 
-    // Géométrie du "waveform" radial : petit au repos, piques nets vers le bord
-    // (calé sur le rendu NZXT CAM).
+    // Géométrie du "waveform" radial : petit au repos, piques nets vers le bord (calé sur le rendu NZXT CAM).
     const float restR = 42.f;                         // rayon au silence (petit cercle)
     const float reach = float(LCD_R) - restR - 8.f;   // extension max des piques
 
@@ -1211,7 +1185,6 @@ void FrameRenderer::renderAudioVisual(QPainter& p, const FrameConfig& cfg)
 
     // ── Pastille centrale RÉACTIVE + logo NZXT ──
     // Le centre respire avec le son (et se déforme légèrement en mode connecté).
-    // Rayon neutre agrandi.
     const float centerMinR = 75.f;                       // cercle neutre (agrandi)
     const float centerR    = centerMinR + level * 32.f;  // respire ~75 → ~107
     QPainterPath centerPath;
@@ -1234,8 +1207,7 @@ void FrameRenderer::renderAudioVisual(QPainter& p, const FrameConfig& cfg)
         p.setBrush(Qt::black);
         p.drawPath(centerPath);
     } else {
-        // Non-invert : au repos le centre est COMPLÈTEMENT noir ; le voile coloré
-        // n'apparaît qu'avec le son, en fondu (transition douce).
+        // Non-invert : au repos le centre est COMPLÈTEMENT noir ; le voile coloré n'apparaît qu'avec le son, en fondu (transition douce).
         p.setBrush(QBrush(grad));
         p.drawPath(centerPath);                                      // couleur sous le voile
         int veilA = int(std::clamp(1.f - level, 0.f, 1.f) * 255.f);  // 255 (silence) → 0 (fort)
@@ -1258,8 +1230,7 @@ void FrameRenderer::renderAudioVisual(QPainter& p, const FrameConfig& cfg)
 
 // ═════════════════════════════════════════════════════════════════
 // NOW PLAYING (musique via SMTC)
-//   Disposition : artiste (haut) → pochette (centre) → barre + timestamp
-//   (sous la pochette) → titre (sous le timestamp). Fond = cfg.bgColor.
+// Disposition : artiste (haut) → pochette (centre) → barre + timestamp (sous la pochette) → titre (sous le timestamp). Fond = cfg.bgColor.
 // ═════════════════════════════════════════════════════════════════
 void FrameRenderer::renderNowPlaying(QPainter& p, const FrameConfig& cfg)
 {
@@ -1283,8 +1254,7 @@ void FrameRenderer::renderNowPlaying(QPainter& p, const FrameConfig& cfg)
         if (dy >= LCD_R) return 0.0;
         return 2.0 * std::sqrt(double(LCD_R) * double(LCD_R) - double(dy) * double(dy));
     };
-    // Défilement va-et-vient : ancre temps réinitialisée au changement de piste,
-    // pour que titre/artiste repartent du début à chaque nouveau morceau.
+    // Défilement va-et-vient : ancre temps réinitialisée au changement de piste, pour que titre/artiste repartent du début à chaque nouveau morceau.
     const QString trackKey = m.artist + QChar(0x1F) + m.title;
     if (trackKey != m_npScrollKey) {
         m_npScrollKey      = trackKey;
@@ -1361,8 +1331,7 @@ void FrameRenderer::renderNowPlaying(QPainter& p, const FrameConfig& cfg)
         }
         titleY = barY + barH + LCD_R * 0.265;
     } else {
-        // Pas de barre/temps (média sans durée, ou option désactivée) → titre
-        // rapproché sous la pochette.
+        // Pas de barre/temps (média sans durée, ou option désactivée) → titre rapproché sous la pochette.
         titleY = coverRect.bottom() + LCD_R * 0.20;
     }
 

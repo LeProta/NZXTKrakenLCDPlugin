@@ -128,8 +128,7 @@ Output: `build/NZXTKrakenLCDPlugin.dll`.
 |---------|-----|
 | No **NZXT Kraken LCD** tab / *"Cannot load the plugin"* | `lhwm-wrapper.dll` is missing from the OpenRGB folder. |
 | CPU temperature/clock shows 0 / N/A | Close NZXT CAM / HWiNFO / Ryzen Master; run OpenRGB as Administrator; or check that *Memory Integrity (HVCI)* / the *Vulnerable Driver Blocklist* is not blocking the sensor driver. |
-| LCD flickering | Confirm WinUSB on Interface 0 and that only one app controls the LCD at a time. |
-| `LNK2038` / `mscoree.lib` not found | Install the **.NET Framework 4.x SDK** component in the Visual Studio Installer, then re-run CMake. |
+| GPU temperature/clock/pourcentage shows 0 / N/A | Make sure you have correctly installed your graphics drivers. |
 
 Logs are written next to OpenRGB's own log files (`NZXTKrakenLCD_<timestamp>.log`).
 

@@ -69,8 +69,7 @@ static QJsonObject readingToJson(const ReadingConfig& rc)
 }
 
 // jsonToReading : reconstruit un ReadingConfig depuis JSON.
-// Rétrocompat avec ancien format (colorNumber/colorText). Le caller peut
-// passer un défaut spécifique au mode (singleReading, dualReading1, etc.).
+// Rétrocompat avec ancien format (colorNumber/colorText). Le caller peut passer un défaut spécifique au mode (singleReading, dualReading1, etc.).
 static ReadingConfig jsonToReading(const QJsonObject& o, const ReadingConfig& fallback)
 {
     if (o.isEmpty()) return fallback;
@@ -168,10 +167,6 @@ FrameConfig KrakenUiPersistence::load()
     // Background générique (Image/GIF, Clock, Audio)
     cfg.bgColor     = jsonToColor(o["bgColor"].toObject(), Qt::black);
 
-    // ─── Migration ancien format → bundles par mode ─────────────────────────
-    // Ancien format : bgColor, logoColor, showLogo, reading1/2/3 (partagés)
-    // Nouveau format : single, dual, triple (ModeConfig) + readings par mode.
-    // Si le nouveau format est absent, on initialise depuis l'ancien.
     const bool hasNewFormat = o.contains("single") || o.contains("singleReading");
 
     if (hasNewFormat) {
@@ -200,8 +195,7 @@ FrameConfig KrakenUiPersistence::load()
         cfg.dual   = migrated;
         cfg.triple = migrated;
 
-        // Migre reading1/2/3 → bundles par mode (chaque mode reçoit les readings
-        // qui le concernent ; les autres restent aux défauts NZXT).
+        // Migre reading1/2/3 → bundles par mode (chaque mode reçoit les readings qui le concernent ; les autres restent aux défauts NZXT).
         const ReadingConfig defS = cfg.singleReading;
         const ReadingConfig defD1 = cfg.dualReading1;
         const ReadingConfig defD2 = cfg.dualReading2;
@@ -220,18 +214,13 @@ FrameConfig KrakenUiPersistence::load()
         cfg.tripleReading2 = r2;
         cfg.tripleReading3 = r3;
 
-        // En Dual, le colorViz par défaut était magenta — si l'utilisateur ne
-        // l'a jamais changé, on remet les défauts NZXT (CPU violet / GPU magenta).
+        // En Dual, le colorViz par défaut était magenta — si l'utilisateur ne l'a jamais changé, on remet les défauts NZXT (CPU violet / GPU magenta).
         if (cfg.dualReading1.colorViz == QColor(0xFF, 0x00, 0xFF))
             cfg.dualReading1.colorViz = defaultDualReading1Color();
         if (cfg.dualReading2.colorViz == QColor(0xFF, 0x00, 0xFF))
             cfg.dualReading2.colorViz = defaultDualReading2Color();
     }
 
-    // ─── Mode : migration de l'ancien enum (modes *_GIF supprimés) ──────────
-    // Ancien enum : 0 Image,1 Single,2 Single+GIF,3 Dual,4 Dual+GIF,5 Triple,
-    // 6 Triple+GIF,7 Clock,8 Audio,9 NowPlaying. Nouveau : les +GIF deviennent
-    // le mode de base, en héritant de l'ancien gifPath partagé.
     if (cfgVersion >= 2) {
         cfg.mode = DisplayMode(mRaw);
     } else {

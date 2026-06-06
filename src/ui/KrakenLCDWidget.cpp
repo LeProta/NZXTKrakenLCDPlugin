@@ -35,8 +35,7 @@ static constexpr qint64 MAX_FILE_SIZE = 32LL * 1024 * 1024;   // 32 MiB
 
 static QString mediaBtnStyle(bool dark)
 {
-    // Meme style que les boutons des popovers (Cancel / Swatch / Custom),
-    // avec surbrillance au survol (QPushButton:hover).
+    // Meme style que les boutons des popovers (Cancel / Swatch / Custom), avec surbrillance au survol (QPushButton:hover).
     if (dark)
         return QStringLiteral(
             "QPushButton{background:#1F1F23;color:#FFFFFF;"
@@ -78,9 +77,7 @@ void LCDPreviewWidget::paintEvent(QPaintEvent*)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
 
-    // Couleurs derivees de la palette de l'application (OpenRGB sombre/clair) :
-    // contour et fond "ecran eteint" suivent le theme automatiquement, Qt
-    // repeignant le widget a chaque changement de palette.
+    // Couleurs derivees de la palette de l'application (OpenRGB sombre/clair) : contour et fond "ecran eteint" suivent le theme automatiquement, Qt repeignant le widget a chaque changement de palette.
     const QColor ring   = palette().color(QPalette::Mid);
     const QColor offScr = palette().color(QPalette::Base);
     QColor       hint   = palette().color(QPalette::WindowText);
@@ -196,8 +193,7 @@ QString* KrakenLCDWidget::activeGifPath()
     }
 }
 
-// Affiche le conteneur média (Upload/Browse) pour Image/GIF, ou pour un mode
-// infographic dont le fond GIF est activé.
+// Affiche le conteneur média (Upload/Browse) pour Image/GIF, ou pour un mode infographic dont le fond GIF est activé.
 void KrakenLCDWidget::updateMediaVisibility()
 {
     if (!m_mediaContainer) return;
@@ -343,8 +339,7 @@ void KrakenLCDWidget::doBrowse()
 
 void KrakenLCDWidget::doRemove()
 {
-    // Retire l'affichage du media du mode courant : on vide juste le chemin,
-    // le fichier reste dans le dossier media/. Le worker re-rend sans media.
+    // Retire l'affichage du media du mode courant : on vide juste le chemin, le fichier reste dans le dossier media/. Le worker re-rend sans media.
     if (QString* tgt = activeGifPath()) {
         if (tgt->isEmpty()) return;
         tgt->clear();
@@ -374,9 +369,7 @@ KrakenLCDWidget::KrakenLCDWidget(QWidget* parent) : QWidget(parent)
     DisplayMode savedMode = m_config.mode;   // sauvegarder avant que buildUI l'écrase
     int savedBrightness   = m_config.brightness;
 
-    // Thème (clair/sombre) hérité d'OpenRGB via la palette de l'application,
-    // détecté AVANT buildUI pour que les boutons Upload/Browse soient stylisés
-    // correctement dès leur création.
+    // Thème (clair/sombre) hérité d'OpenRGB via la palette de l'application, détecté AVANT buildUI pour que les boutons Upload/Browse soient stylisés correctement dès leur création.
     m_darkTheme = palette().color(QPalette::Window).lightness() < 128;
 
     buildUI();
@@ -407,8 +400,7 @@ KrakenLCDWidget::KrakenLCDWidget(QWidget* parent) : QWidget(parent)
     // Premier appel réel de onModeChanged (met à jour panels, media container, timers)
     onModeChanged(m_modeCombo->currentIndex());
 
-    // Démarrer les timers (le render timer reprend l'intervalle calculé par
-    // onModeChanged ci-dessus, c.-à-d. la cadence de l'écran du modèle détecté).
+    // Démarrer les timers (le render timer reprend l'intervalle calculé par onModeChanged ci-dessus, c.-à-d. la cadence de l'écran du modèle détecté).
     // --- Worker de rendu sur thread dedie ---
     m_thread = new QThread(this);
     m_worker = new KrakenWorker(&m_device, &m_sensors);
@@ -559,8 +551,7 @@ void KrakenLCDWidget::buildModeSelector()
 {
     m_modeCombo = new QComboBox;
 
-    // ── Bloquer les signaux pendant l'ajout pour éviter des appels à
-    //    onModeChanged() alors que les widgets n'existent pas encore ─────────
+    // ── Bloquer les signaux pendant l'ajout pour éviter des appels à onModeChanged() alors que les widgets n'existent pas encore ─────────
     m_modeCombo->blockSignals(true);
 
     m_modeCombo->addItem("Image/GIF",                   int(DisplayMode::IMAGE_GIF));
@@ -745,9 +736,7 @@ void KrakenLCDWidget::buildModePanel_Clockface()
     faceCombo->addItem("Analog"); faceCombo->addItem("Gradient"); faceCombo->addItem("Digital");
     mRow->addWidget(faceCombo); mRow->addStretch(); l->addLayout(mRow);
 
-    // Un conteneur de réglages par clockface, affiché/masqué selon la sélection
-    // (comme le logo du dual) : un conteneur masqué ne prend aucune place, donc
-    // plus d'espace vide entre les éléments quelle que soit la clockface.
+    // Un conteneur de réglages par clockface, affiché/masqué selon la sélection (comme le logo du dual) : un conteneur masqué ne prend aucune place, donc plus d'espace vide entre les éléments quelle que soit la clockface.
     auto* pageAnalog = new QWidget;  auto* plA = new QVBoxLayout(pageAnalog);
     plA->setContentsMargins(0,0,0,0); plA->setSpacing(8);
     colorRow(plA, "Background", m_config.bgColor);
@@ -912,8 +901,7 @@ void KrakenLCDWidget::onModeChanged(int /*index*/)
             m_stack->setCurrentWidget(p);
     }
 
-    // Cadence de rendu + WASAPI : geres par le worker (applyCadence),
-    // declenche par le setConfig() ci-dessus quand le mode change.
+    // Cadence de rendu + WASAPI : geres par le worker (applyCadence), declenche par le setConfig() ci-dessus quand le mode change.
 }
 
 // onRenderTick / onSensorTick : deplaces dans KrakenWorker (thread de rendu).
@@ -941,16 +929,14 @@ void KrakenLCDWidget::setDarkTheme(bool dark)
 void KrakenLCDWidget::changeEvent(QEvent* e)
 {
     QWidget::changeEvent(e);
-    // OpenRGB applique sa palette (sombre/claire) à toute l'application ; on suit
-    // ses changements de thème à chaud pour restyler les boutons Upload/Browse.
+    // OpenRGB applique sa palette (sombre/claire) à toute l'application ; on suit ses changements de thème à chaud pour restyler les boutons Upload/Browse.
     if (e && (e->type() == QEvent::PaletteChange ||
               e->type() == QEvent::ApplicationPaletteChange)) {
         const bool dark = palette().color(QPalette::Window).lightness() < 128;
         if (dark != m_darkTheme)
             setDarkTheme(dark);
     }
-    // OpenRGB change la langue à chaud (installTranslator -> LanguageChange) ;
-    // on resuit l'unité de température (°C/°F) selon la locale OpenRGB.
+    // OpenRGB change la langue à chaud (installTranslator -> LanguageChange) ; on resuit l'unité de température (°C/°F) selon la locale OpenRGB.
     if (e && e->type() == QEvent::LanguageChange) {
         FrameRenderer::setFahrenheit(OpenRGBSettings::prefersFahrenheit());
     }

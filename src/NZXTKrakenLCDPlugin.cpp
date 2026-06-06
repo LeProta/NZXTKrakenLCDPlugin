@@ -321,7 +321,7 @@ QWidget* NZXTKrakenLCDPlugin::GetWidget()
 {
     if (m_widget) return m_widget;
 
-    // lhwm-wrapper.dll absente → message global (comme le plugin Hardware Fan Sync).
+    // lhwm-wrapper.dll absente → message global.
     QLabel* label = new QLabel(
         QStringLiteral(
             "<h1>Cannot load the plugin.</h1>"

@@ -94,13 +94,8 @@ struct MediaSession::Impl {
 
     // Position via une horloge monotone interne, recalée sur l'app au besoin.
     //
-    // On fait avancer la position NOUS-MÊMES tant que ça joue (free-run) et on ne
-    // se recale sur la valeur de l'app que lorsqu'elle publie une NOUVELLE position
-    // (≠ précédente) — soit un saut net (seek), soit l'app a pris de l'avance.
-    // Conséquence : plus de gel (apps qui ne rafraîchissent pas Position après un
-    // seek, ou qui ne la fournissent pas comme Cider) ni de reculs (petit retard
-    // de l'app). La durée, elle, est maintenue (hold last-good) à travers les
-    // rapports dégénérés (durée qui retombe à ~0 juste après un seek).
+    // On fait avancer la position NOUS-MÊMES tant que ça joue (free-run) et on ne se recale sur la valeur de l'app que lorsqu'elle publie une NOUVELLE position (≠ précédente) — soit un saut net (seek), soit l'app a pris de l'avance.
+    // Conséquence : plus de gel (apps qui ne rafraîchissent pas Position après un seek, ou qui ne la fournissent pas comme Cider) ni de reculs (petit retard de l'app). La durée, elle, est maintenue (hold last-good) à travers les rapports dégénérés (durée qui retombe à ~0 juste après un seek).
     void applyTimeline(const RawTimeline& rt, MediaSnapshot& out)
     {
         const auto now = std::chrono::steady_clock::now();

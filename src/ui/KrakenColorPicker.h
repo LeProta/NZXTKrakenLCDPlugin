@@ -105,8 +105,7 @@ private:
 };
 
 // ───────────────────────────────────────────────────────────────────────────
-// GradientStopsEditor : barre interactive (drag stops, clic droit ajoute,
-// drag bas supprime). Émet stopsChanged en temps réel.
+// GradientStopsEditor : barre interactive (drag stops, clic droit ajoute, drag bas supprime). Émet stopsChanged en temps réel.
 // ───────────────────────────────────────────────────────────────────────────
 class GradientStopsEditor : public QWidget {
     Q_OBJECT

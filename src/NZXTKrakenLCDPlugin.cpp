@@ -19,18 +19,10 @@
 // ============================================================================
 //  Logging du plugin, integre aux reglages d'OpenRGB
 //  ------------------------------------------------------------------------
-//  Le plugin ne peut PAS appeler le LogManager d'OpenRGB directement : sous
-//  Windows il faudrait linker OpenRGB.exe (dont les symboles ne sont pas
-//  exportes), ce que ce plugin autonome evite volontairement. A la place on
-//  installe un handler de messages Qt qui REPRODUIT le comportement et le
-//  format d'OpenRGB :
-//    * lit OpenRGB.json (section "LogManager") pour respecter les cases
-//      "Enable Log File" / "Enable Log Console", le "loglevel" et le
-//      "file_count_limit" ;
-//    * ecrit dans le dossier logs/ d'OpenRGB, avec le meme schema de nom
-//      (NZXTKrakenLCD_<AAAAMMJJ_HHMMSS>.log, comme OpenRGB_<...>.log) ;
-//    * meme entete (lignes indentees + separateur de 100 '=') et meme format
-//      de ligne :  <ms>  |<Code>  <message>  ;
+//  Le plugin ne peut PAS appeler le LogManager d'OpenRGB directement : sous Windows il faudrait linker OpenRGB.exe (dont les symboles ne sont pas exportes), ce que ce plugin autonome evite volontairement. A la place on installe un handler de messages Qt qui REPRODUIT le comportement et le format d'OpenRGB :
+//    * lit OpenRGB.json (section "LogManager") pour respecter les cases "Enable Log File" / "Enable Log Console", le "loglevel" et le "file_count_limit" ;
+//    * ecrit dans le dossier logs/ d'OpenRGB, avec le meme schema de nom (NZXTKrakenLCD_<AAAAMMJJ_HHMMSS>.log, comme OpenRGB_<...>.log) ;
+//    * meme entete (lignes indentees + separateur de 100 '=') et meme format de ligne :  <ms>  |<Code>  <message>  ;
 //    * applique la rotation par file_count_limit (comme OpenRGB) ;
 //    * filtre par niveau (meme logique qu'OpenRGB) ;
 //    * relaie au handler precedent les messages des autres composants.
@@ -152,8 +144,7 @@ void writeRaw(const QString& text)
 
 void krakenMessageHandler(QtMsgType type, const QMessageLogContext& ctx, const QString& msg)
 {
-    // Tag [Sous-systeme] en tete : le premier segment sert au routage, mais on
-    // n'affiche que le dernier ([KrakenLCD/WinHID] -> [WinHID], [Sensors] -> [Sensors]).
+    // Tag [Sous-systeme] en tete : le premier segment sert au routage, mais on n'affiche que le dernier ([KrakenLCD/WinHID] -> [WinHID], [Sensors] -> [Sensors]).
     QString tag;
     int close = -1;
     if (msg.startsWith('[')) {

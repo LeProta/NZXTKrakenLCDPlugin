@@ -53,9 +53,7 @@ void KrakenWorker::setConfig(const FrameConfig& cfg)
         modeChanged = (cfg.mode != m_cfg.mode);
         m_cfg = cfg;
     }
-    // La cadence + WASAPI dépendent du mode : on (re)calcule sur le thread du
-    // worker quand le mode change (applyCadence touche le QTimer, qui a son
-    // affinité sur ce thread).
+    // La cadence + WASAPI dépendent du mode : on (re)calcule sur le thread du worker quand le mode change (applyCadence touche le QTimer, qui a son affinité sur ce thread).
     if (modeChanged)
         QMetaObject::invokeMethod(this, "applyCadence", Qt::QueuedConnection);
 }
@@ -64,9 +62,7 @@ void KrakenWorker::setConfig(const FrameConfig& cfg)
 void KrakenWorker::start()
 {
 #ifdef _WIN32
-    // COM pour WMI (capteurs) + WASAPI, sur CE thread. MTA = pas de pompe de
-    // messages requise. On n'équilibre par CoUninitialize que si on a réellement
-    // initialisé (S_OK) ; S_FALSE/RPC_E_CHANGED_MODE → on ne reprend pas de réf.
+    // COM pour WMI (capteurs) + WASAPI, sur CE thread. MTA = pas de pompe de messages requise. On n'équilibre par CoUninitialize que si on a réellement initialisé (S_OK) ; S_FALSE/RPC_E_CHANGED_MODE → on ne reprend pas de réf.
     HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     m_comInit = (hr == S_OK);
 #endif
@@ -155,9 +151,7 @@ void KrakenWorker::renderTick()
 {
     const FrameConfig cfg = currentConfig();
 
-    // Mode musique : timeline (position/lecture) rafraîchie à chaque frame pour un
-    // timestamp fluide qui suit aussi les seeks (appel synchrone léger ; les
-    // métadonnées + pochette restent gérées au rythme lent de sensorTick).
+    // Mode musique : timeline (position/lecture) rafraîchie à chaque frame pour un timestamp fluide qui suit aussi les seeks (appel synchrone léger ; les métadonnées + pochette restent gérées au rythme lent de sensorTick).
     if (cfg.mode == DisplayMode::NOW_PLAYING) {
         MediaSnapshot snap;
         m_media.pollTimeline(snap);
@@ -171,8 +165,7 @@ void KrakenWorker::renderTick()
 
     QImage frame = m_renderer.render(cfg);
 
-    // Apercu UI plafonne a ~30 fps (decouple de la cadence device) : l'UI n'a pas
-    // besoin de plus, et ca evite d'inonder le thread UI quand l'ecran tourne a 60 fps.
+    // Apercu UI plafonne a ~30 fps (decouple de la cadence device) : l'UI n'a pas besoin de plus, et ca evite d'inonder le thread UI quand l'ecran tourne a 60 fps.
     if (!m_previewClock.isValid() || m_previewClock.elapsed() >= 33) {
         emit previewReady(frame);   // copie COW vers l'UI (QueuedConnection)
         m_previewClock.restart();
@@ -195,8 +188,7 @@ void KrakenWorker::renderTick()
 // ── Lecture capteurs HID du Kraken (température liquide / RPM) ───────────────
 void KrakenWorker::sensorTick()
 {
-    // Mode musique : on rafraîchit le "now playing" (SMTC) ~1×/s. Indépendant
-    // du device (l'aperçu UI fonctionne aussi sans Kraken branché).
+    // Mode musique : on rafraîchit le "now playing" (SMTC) ~1×/s. Indépendant du device (l'aperçu UI fonctionne aussi sans Kraken branché).
     if (currentConfig().mode == DisplayMode::NOW_PLAYING) {
         MediaSnapshot snap;
         m_media.poll(snap);
@@ -218,7 +210,6 @@ void KrakenWorker::sensorTick()
 
 // ═════════════════════════════════════════════════════════════════════════════
 // WASAPI loopback (déplacé depuis KrakenLCDWidget — capture sur le thread de rendu).
-// COM est déjà initialisé (MTA) par start() ; on ne refait PAS CoInitializeEx ici.
 // ═════════════════════════════════════════════════════════════════════════════
 #ifdef _WIN32
 

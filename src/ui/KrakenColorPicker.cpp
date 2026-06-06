@@ -163,24 +163,16 @@ void ColorSwatchButton::paintEvent(QPaintEvent*)
     // On désactive l'antialiasing pour avoir des bords ultra-nets (pixel perfect)
     p.setRenderHint(QPainter::Antialiasing, false);
 
-    // CORRECTION : On utilise la palette globale de l'application pour savoir si 
-    // l'UI est sombre. Ça évite le bug du bouton transparent.
     QColor globalBg = QApplication::palette().color(QPalette::Window);
     bool dark = globalBg.lightnessF() < 0.5;
     
-    // Couleurs d'outline reprises des panels de couleurs (palette popover
-    // "border") : un gris foncé et un gris clair, jamais du noir/blanc pur.
     const QColor OUTLINE_DARK  = QColor("#2A2A2E");
     const QColor OUTLINE_LIGHT = QColor("#D0D0D4");
 
-    // Contour des éléments de l'UI générale : gris foncé en thème sombre,
-    // gris clair en thème clair (mêmes couleurs que les outlines des panels).
+    // Contour des éléments de l'UI générale : gris foncé en thème sombre, gris clair en thème clair (mêmes couleurs que les outlines des panels).
     QColor borderCol = dark ? OUTLINE_DARK : OUTLINE_LIGHT;
 
-    // Pointillés des bordures "invisible" (outline absent) : même principe que
-    // dans les panels — gris foncé si le remplissage est clair, gris clair s'il
-    // est foncé (pas de noir/blanc pur). Un remplissage transparent est rendu
-    // sur fond blanc, donc traité comme clair → pointillés foncés.
+    // Pointillés des bordures "invisible" (outline absent) : même principe que dans les panels — gris foncé si le remplissage est clair, gris clair s'il est foncé (pas de noir/blanc pur). Un remplissage transparent est rendu sur fond blanc, donc traité comme clair → pointillés foncés.
     auto dashColorFor = [&](const QColor& fill) -> QColor {
         if (fill.alpha() == 0) return OUTLINE_DARK;
         return fill.lightnessF() >= 0.5 ? OUTLINE_DARK : OUTLINE_LIGHT;
@@ -201,8 +193,7 @@ void ColorSwatchButton::paintEvent(QPaintEvent*)
     };
 
     if (isPopover) {
-        // Le contour des swatches reprend la couleur d'outline des boutons
-        // (border), centralisée plus haut : OUTLINE_DARK / OUTLINE_LIGHT.
+        // Le contour des swatches reprend la couleur d'outline des boutons (border), centralisée plus haut : OUTLINE_DARK / OUTLINE_LIGHT.
         const QColor popBorderCol = dark ? OUTLINE_DARK : OUTLINE_LIGHT;
         if (m_hovered) {
             // Hover : seul le contour s'élargit (2px) ; la couleur touche la
@@ -323,9 +314,7 @@ void HueSlider::paintEvent(QPaintEvent*) {
     g.setColorAt(1.0,     QColor(0xFF,0,0));
     QPainterPath path; path.addRoundedRect(r, r.height()/2, r.height()/2);
     p.fillPath(path, g);
-    // Garde la bulle entièrement visible (au-dessus du fond) même aux
-    // extrémités : on borne le centre pour que le cercle (rayon 6 + 1px de
-    // contour) ne déborde pas hors du widget, où il serait rogné.
+    // Garde la bulle entièrement visible (au-dessus du fond) même aux extrémités : on borne le centre pour que le cercle (rayon 6 + 1px de contour) ne déborde pas hors du widget, où il serait rogné.
     const qreal handleR = 6.0;
     const qreal margin  = handleR + 1.0;
     const qreal cx = std::clamp(qreal(m_hue) / 360.0 * width(), margin, qreal(width()) - margin);

@@ -127,7 +127,6 @@ Output: `build/NZXTKrakenLCDPlugin.dll`.
 | Symptom | Fix |
 |---------|-----|
 | No **NZXT Kraken LCD** tab / *"Cannot load the plugin"* | `lhwm-wrapper.dll` is missing from the OpenRGB folder. |
-| Screen not detected / *bulk USB unavailable* | The WinUSB driver is not installed on **Interface 0**. Use [Zadig](https://zadig.akeo.ie): **Options → List All Devices** → select `NZXT Kraken … (Interface 0)` → install **WinUSB**. Note: this prevents NZXT CAM from controlling the LCD. |
 | CPU temperature/clock shows 0 / N/A | Close NZXT CAM / HWiNFO / Ryzen Master; run OpenRGB as Administrator; or check that *Memory Integrity (HVCI)* / the *Vulnerable Driver Blocklist* is not blocking the sensor driver. |
 | LCD flickering | Confirm WinUSB on Interface 0 and that only one app controls the LCD at a time. |
 | `LNK2038` / `mscoree.lib` not found | Install the **.NET Framework 4.x SDK** component in the Visual Studio Installer, then re-run CMake. |

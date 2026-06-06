@@ -7,8 +7,7 @@ namespace NZXTKraken {
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Instantané de la lecture média en cours (now playing).
-//  Rempli par MediaSession via l'API Windows SMTC. Tous les champs sont neutres
-//  (active=false) si rien ne joue ou si l'API échoue.
+//  Rempli par MediaSession via l'API Windows SMTC. Tous les champs sont neutres (active=false) si rien ne joue ou si l'API échoue.
 // ─────────────────────────────────────────────────────────────────────────────
 struct MediaSnapshot {
     bool    active       = false;  // true si une session média existe
@@ -24,14 +23,10 @@ struct MediaSnapshot {
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  MediaSession
-//   Lit le « Now Playing » de Windows via GlobalSystemMediaTransportControls
-//   (SMTC / Windows.Media.Control). Agrège n'importe quelle app média
-//   (Spotify, navigateur, Apple Music, Tidal…). Détails WinRT confinés au .cpp
-//   (PIMPL) pour ne pas polluer les en-têtes.
+//   Lit le « Now Playing » de Windows via GlobalSystemMediaTransportControls (SMTC / Windows.Media.Control). Agrège n'importe quelle app média
+//   (Spotify, navigateur, Apple Music, Tidal…). Détails WinRT confinés au .cpp (PIMPL) pour ne pas polluer les en-têtes.
 //
-//   IMPORTANT — SMTC ne pousse Position qu'au play/pause/seek (pas en continu).
-//   On l'extrapole donc via LastUpdatedTime quand ça joue, sinon le timestamp
-//   resterait figé pendant la lecture.
+//   IMPORTANT — SMTC ne pousse Position qu'au play/pause/seek (pas en continu). On l'extrapole donc via LastUpdatedTime quand ça joue, sinon le timestamp resterait figé pendant la lecture.
 //
 //   Deux niveaux de rafraîchissement (à appeler depuis un thread COM/MTA) :
 //     • poll()         : COMPLET (métadonnées + pochette + timeline). Appel lent
@@ -49,12 +44,10 @@ public:
     MediaSession(const MediaSession&)            = delete;
     MediaSession& operator=(const MediaSession&) = delete;
 
-    // Complet : métadonnées + pochette + timeline. Pochette re-décodée seulement
-    // au changement de morceau (cache interne).
+    // Complet : métadonnées + pochette + timeline. Pochette re-décodée seulement au changement de morceau (cache interne).
     bool poll(MediaSnapshot& out);
 
-    // Léger : rafraîchit position/durée/lecture/vitesse (extrapolées), en
-    // réutilisant titre/artiste/album/pochette du dernier poll() complet.
+    // Léger : rafraîchit position/durée/lecture/vitesse (extrapolées), en réutilisant titre/artiste/album/pochette du dernier poll() complet.
     bool pollTimeline(MediaSnapshot& out);
 
 private:

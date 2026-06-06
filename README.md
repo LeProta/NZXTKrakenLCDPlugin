@@ -130,7 +130,7 @@ Output: `build/NZXTKrakenLCDPlugin.dll`.
 | CPU temperature/clock shows 0 / N/A | Close NZXT CAM / HWiNFO / Ryzen Master; run OpenRGB as Administrator; or check that *Memory Integrity (HVCI)* / the *Vulnerable Driver Blocklist* is not blocking the sensor driver. |
 | GPU temperature/clock/pourcentage shows 0 / N/A | Make sure you have correctly installed your graphics drivers. |
 
-Logs are written next to OpenRGB's own log files (`NZXTKrakenLCD_<timestamp>.log`), and make sure you have enabled logs in the OpenRGB settings for the information to appear.
+Logs are written next to OpenRGB's own log files (`NZXTKrakenLCD_<timestamp>.log`), and make sure you have enabled logs in the OpenRGB settings for the logs to appear.
 
 ---
 

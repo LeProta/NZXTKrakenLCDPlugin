@@ -15,16 +15,12 @@ class NZXTKrakenDevice;   // emprunté (possédé par le widget)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KrakenWorker
-//   Vit sur son propre QThread. Possède TOUTE l'I/O lourde qui causait les
-//   micro-saccades quand elle tournait sur le thread UI :
+//   Vit sur son propre QThread. Possède TOUTE l'I/O lourde qui causait les micro-saccades quand elle tournait sur le thread UI :
 //     • rendu QPainter + encodage (Q565 / JPEG) ;
-//     • envoi USB (sendFrame, bloquant) — un seul thread, donc PAS de backlog :
-//       chaque tick rend la config la plus fraîche puis l'envoie
-//       (latest-frame-wins implicite, aucune file qui gonfle) ;
+//     • envoi USB (sendFrame, bloquant) — un seul thread, donc PAS de backlog : chaque tick rend la config la plus fraîche puis l'envoie (latest-frame-wins implicite, aucune file qui gonfle) ;
 //     • polling capteurs système (WMI/PDH/D3DKMT) + lecture HID du Kraken ;
 //     • capture audio WASAPI loopback.
-//   Le device et les capteurs restent possédés par le widget ; le worker ne fait
-//   que les piloter, EXCLUSIVEMENT depuis ce thread (aucune I/O sur l'UI).
+//   Le device et les capteurs restent possédés par le widget ; le worker ne fait que les piloter, EXCLUSIVEMENT depuis ce thread (aucune I/O sur l'UI).
 // ─────────────────────────────────────────────────────────────────────────────
 class KrakenWorker : public QObject {
     Q_OBJECT

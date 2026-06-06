@@ -142,11 +142,6 @@ bool NZXTKrakenDevice::openHID(uint16_t vid, uint16_t pid)
 }
 
 // ─── Envoi de commande HID — adapté à la taille du rapport du device ────────
-//
-// Le Kraken Elite V2 (PID 0x3012/0x3013) utilise des rapports HID de 512 octets,
-// les anciens modèles utilisent 64 octets. Le paquet envoyé doit faire exactement
-// reportLen+1 octets (1 byte ReportID 0x00 + reportLen bytes de données).
-//
 bool NZXTKrakenDevice::sendHIDCommand(const uint8_t* data, size_t len)
 {
     if (!data) return false;
@@ -155,8 +150,6 @@ bool NZXTKrakenDevice::sendHIDCommand(const uint8_t* data, size_t len)
 
 #ifdef _WIN32
     // Plan A : WinHID direct (HidD_SetOutputReport)
-    // C'est la voie la plus fiable sous Windows — elle contourne le bug
-    // d'hidapi 0.14 sur WriteFile et utilise directement l'API Windows HID.
     if (m_winHidHandle != INVALID_HANDLE_VALUE) {
         if (winHidWrite(data, len))
             return true;
@@ -169,10 +162,6 @@ bool NZXTKrakenDevice::sendHIDCommand(const uint8_t* data, size_t len)
         if (len > (size_t)reportLen) len = reportLen;
         std::memcpy(pkt.data(), data, len);
 
-        // bmRequestType = 0x21 : Host-to-Device | Class | Interface
-        // bRequest      = 0x09 : SET_REPORT
-        // wValue        = 0x0200 : ReportType=Output(2) << 8 | ReportID=0
-        // wIndex        = 1 (interface HID)
         int r = libusb_control_transfer(
             m_usbDev,
             static_cast<uint8_t>(LIBUSB_RECIPIENT_INTERFACE | LIBUSB_REQUEST_TYPE_CLASS | LIBUSB_ENDPOINT_OUT),
@@ -221,7 +210,6 @@ bool NZXTKrakenDevice::sendHIDCommand(const uint8_t* data, size_t len)
 bool NZXTKrakenDevice::readHIDResponse(uint8_t* buf, size_t maxLen, int timeoutMs)
 {
     // Prioriser hidapi pour la lecture — hid_read_timeout attend un nouveau
-    // rapport, contrairement à HidD_GetInputReport qui poll le dernier buffer.
     if (m_hid) {
         int r = hid_read_timeout(m_hid, buf, maxLen, timeoutMs);
         return r > 0;
@@ -277,15 +265,10 @@ bool NZXTKrakenDevice::sendBulkData(const uint8_t* data, size_t len)
                                      &transferred,
                                      BULK_TIMEOUT_MS);
         if (transferred > 0) {
-            // Progrès réel : on avance du nombre d'octets effectivement transmis
-            // (même si r<0 a renvoyé un transfert partiel) — évite tout renvoi en
-            // double, qui décalerait les données côté device.
             offset += static_cast<size_t>(transferred);
             stalls = 0;
             continue;
         }
-        // Aucun octet transmis : stall/erreur. On débloque l'endpoint et on réessaie
-        // quelques fois avant d'abandonner la frame.
         if (r == LIBUSB_ERROR_PIPE && m_usbDev)
             libusb_clear_halt(m_usbDev, BULK_ENDPOINT);
         if (++stalls >= 3) {
@@ -309,7 +292,6 @@ bool NZXTKrakenDevice::sendBulkData(const uint8_t* data, size_t len)
 bool NZXTKrakenDevice::sendFrameStart(uint32_t jpegSize)
 {
     // Le streamKind est géré par sendFrame via le header bulk
-    // Ici on envoie toujours la commande start avec le streamKind du device
     const uint8_t streamKind = m_info ? m_info->streamKind : 0x06;
     uint8_t cmd[5] = { 0x36, 0x01, 0x00, 0x01, streamKind };
     return sendHIDCommand(cmd, sizeof(cmd));
@@ -330,7 +312,6 @@ bool NZXTKrakenDevice::sendFrame(const QByteArray& imageData, uint8_t streamKind
 
     // ── Anti-flood : espacement mini = période de l'écran du modèle ──────────
     // 60 Hz (Elite) → ~16 ms, 30 Hz (Kraken/Z) → ~33 ms. Évite de saturer le device
-    // tout en autorisant le plein régime des écrans 60 Hz.
     const int minMs = (m_info && m_info->maxFps > 0) ? (1000 / m_info->maxFps) : 33;
     if (m_lastFrameTimeValid) {
         qint64 elapsed = m_lastFrameTime.elapsed();
@@ -353,14 +334,12 @@ bool NZXTKrakenDevice::sendFrame(const QByteArray& imageData, uint8_t streamKind
                       << "payloadSize=" << sz;
 
     // ── Vider les messages HID en attente (purge) ────────────────────────
-    // Comme le driver Python fait un "clear" avant chaque writeFrame.
     {
         uint8_t discard[64];
         while (readHIDResponse(discard, sizeof(discard), 1)) {}
     }
 
     // 1) Commande start HID : [0x36, 0x01, 0x00, 0x01, streamKind]
-    // Le driver Python envoie exactement ça pour le Q565 Elite V2.
     {
         uint8_t cmd[5] = { 0x36, 0x01, 0x00, 0x01, sk };
         if (!sendHIDCommand(cmd, sizeof(cmd))) {
@@ -370,8 +349,6 @@ bool NZXTKrakenDevice::sendFrame(const QByteArray& imageData, uint8_t streamKind
     }
 
     // 2) Attendre la réponse 0x37 0x01 (start ack) du device
-    //    C'est CRITIQUE — sans cette attente, le device n'est pas prêt
-    //    et rejette le bulk data, causant le clignotement.
     {
         uint8_t resp[64];
         bool gotAck = false;
@@ -407,12 +384,7 @@ bool NZXTKrakenDevice::sendFrame(const QByteArray& imageData, uint8_t streamKind
         static_cast<uint8_t>((sz >> 24) & 0xFF),
     };
 
-    // Récupération si un transfert échoue en cours. Le device a été averti (header)
-    // qu'il recevrait `sz` octets ; s'il n'en reçoit qu'une partie, il reste en
-    // attente du reste et la frame SUIVANTE vient s'y coller → décalage → bandes
-    // horizontales persistantes. On le resynchronise : end (vide son buffer de
-    // frame), clear-halt d'un éventuel blocage du endpoint, et on invalide
-    // l'anti-flood pour que la frame suivante reparte sur une base propre.
+    // Récupération si un transfert échoue en cours. Le device a été averti (header) qu'il recevrait `sz` octets ; s'il n'en reçoit qu'une partie, il reste en attente du reste et la frame SUIVANTE vient s'y coller → décalage → bandes horizontales persistantes. On le resynchronise : end (vide son buffer de frame), clear-halt d'un éventuel blocage du endpoint, et on invalide l'anti-flood pour que la frame suivante reparte sur une base propre.
     auto resyncDevice = [&]() {
         uint8_t endCmd[3] = { 0x36, 0x02, 0x00 };
         sendHIDCommand(endCmd, sizeof(endCmd));
@@ -436,7 +408,6 @@ bool NZXTKrakenDevice::sendFrame(const QByteArray& imageData, uint8_t streamKind
     }
 
     // 5) Commande end HID : [0x36, 0x02]
-    //    Le driver Python envoie TOUJOURS cette commande, même pour le V2 !
     {
         uint8_t cmd[2] = { 0x36, 0x02 };
         sendHIDCommand(cmd, sizeof(cmd));
@@ -632,15 +603,7 @@ bool NZXTKrakenDevice::winHidWrite(const uint8_t* data, size_t len)
     if (m_winHidHandle == INVALID_HANDLE_VALUE || !data || m_winHidOutputLen <= 0)
         return false;
 
-    // Le Kraken Elite V2 utilise des rapports HID de 512 octets.
-    // SignalRGB envoie device.write([0x36, ...], 512) — c'est un WriteFile
-    // de 512 octets où data[0] est la commande (pas un ReportID).
-    //
-    // Sur ce device, les rapports n'ont PAS de ReportID numéroté
-    // (UsagePage=0xFF00, Vendor Defined). Le buffer WriteFile doit faire
-    // exactement OutputReportByteLength octets.
-
-    // === Stratégie 1: WriteFile direct (comme SignalRGB) ===
+    // === Stratégie 1: WriteFile direct ===
     // Pas de ReportID préfixé — les données commencent directement par la commande.
     {
         std::vector<BYTE> buf(m_winHidOutputLen, 0);

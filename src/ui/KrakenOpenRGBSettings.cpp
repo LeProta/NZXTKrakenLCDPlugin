@@ -63,8 +63,7 @@ bool prefersFahrenheit()
     if (lang.contains(QStringLiteral("US")))
         return true;
 
-    // "System Default" (texte affiché) / "default" / vide -> suivre la locale
-    // système. Toute autre langue explicite -> Celsius.
+    // "System Default" (texte affiché) / "default" / vide -> suivre la locale système. Toute autre langue explicite -> Celsius.
     const bool systemDefault =
            lang.isEmpty()
         || lang.compare(QStringLiteral("default"), Qt::CaseInsensitive) == 0

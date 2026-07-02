@@ -67,7 +67,9 @@ Download the prebuilt **`NZXTKrakenLCDPlugin.dll`** from the [Releases](https://
 
 System sensors are read through [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) via this bridge DLL.
 
-**[Download](https://gitlab.com/OpenRGBDevelopers/OpenRGBHardwareSyncPlugin/-/raw/master/dependencies/lhwm-cpp-wrapper/x64/Release/lhwm-wrapper.dll) `lhwm-wrapper.dll`** (from the OpenRGB Hardware Sync plugin) and place it in the **same folder as `OpenRGB.exe`**. Without it, the plugin loads but shows *"Cannot load the plugin"*.
+**Download `lhwm-wrapper.dll` from [LeProta/lhwm-wrapper](https://github.com/LeProta/lhwm-wrapper/releases)** and place it in the **same folder as `OpenRGB.exe`**. Without it, the plugin loads but shows *"Cannot load the plugin"*.
+
+> The same file is shared with the [NZXT Kraken Pump plugin](https://github.com/LeProta/NZXTKrakenPumpPlugin) — one copy serves both.
 
 ### 3. Install the plugin
 
@@ -103,7 +105,7 @@ Required to read CPU and motherboard temperatures (ring-0 sensor driver). Liquid
 Use an **x64 Native Tools Command Prompt for VS**:
 
 ```bat
-git clone https://github.com/LeProtagoniste/NZXTKrakenLCDPlugin
+git clone https://github.com/LeProta/NZXTKrakenLCDPlugin
 cd NZXTKrakenLCDPlugin
 
 cmake -S . -B build -G "NMake Makefiles" ^
@@ -128,7 +130,7 @@ Output: `build/NZXTKrakenLCDPlugin.dll`.
 |---------|-----|
 | No **NZXT Kraken LCD** tab / *"Cannot load the plugin"* | `lhwm-wrapper.dll` is missing from the OpenRGB folder. |
 | CPU temperature/clock shows 0 / N/A | Close NZXT CAM / HWiNFO / Ryzen Master; run OpenRGB as Administrator; or check that *Memory Integrity (HVCI)* / the *Vulnerable Driver Blocklist* is not blocking the sensor driver. |
-| GPU temperature/clock/pourcentage shows 0 / N/A | Make sure you have correctly installed your graphics drivers. |
+| GPU temperature/clock/load shows 0 / N/A | Make sure you have correctly installed your graphics drivers. |
 
 Logs are written next to OpenRGB's own log files (`NZXTKrakenLCD_<timestamp>.log`), and make sure you have enabled logs in the OpenRGB settings for the logs to appear.
 
@@ -140,6 +142,7 @@ Logs are written next to OpenRGB's own log files (`NZXTKrakenLCD_<timestamp>.log
 - **Frame pipeline.** Render with `QPainter` → encode (Q565 for the 640×640 Elite V2, JPEG for 480×480 Z-series) → HID handshake (`0x36 0x01` / wait for `0x37 0x01`) → bulk transfer → `0x36 0x02` end. Sends run on a dedicated worker thread.
 - **Sensors.** System metrics from LibreHardwareMonitor (`lhwm-wrapper.dll`); coolant temperature and RPMs from the cooler over HID.
 - **Cadence.** Animated modes run at the panel maximum (30 or 60 Hz); static stat screens update at ~5 Hz.
+- **Coexistence.** Runs alongside the [NZXT Kraken Pump plugin](https://github.com/LeProta/NZXTKrakenPumpPlugin) on the same cooler: each plugin opens its own HID handle, Windows duplicates input reports to every handle and serializes writes.
 
 ---
 
@@ -147,7 +150,14 @@ Logs are written next to OpenRGB's own log files (`NZXTKrakenLCD_<timestamp>.log
 
 - [OpenRGB](https://gitlab.com/CalcProgrammer1/OpenRGB) — host application and plugin SDK.
 - [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) — system sensor backend (MPL-2.0).
-- `lhwm-cpp-wrapper` — C++/CLI wrapper shipped with the [OpenRGB Hardware Sync plugin](https://gitlab.com/OpenRGBDevelopers/OpenRGBHardwareSyncPlugin).
+- [lhwm-wrapper](https://github.com/LeProta/lhwm-wrapper) — C++/CLI bridge over LibreHardwareMonitor.
+
+---
+
+## Related
+
+- [NZXT Kraken Pump plugin](https://github.com/LeProta/NZXTKrakenPumpPlugin) — pump & fan curve control for the same coolers and motherboard fans.
+- [lhwm-wrapper](https://github.com/LeProta/lhwm-wrapper) — the sensor bridge DLL used by both plugins.
 
 ---
 

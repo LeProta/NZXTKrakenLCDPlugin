@@ -90,6 +90,8 @@ private:
     NZXTKrakenDevice  m_device;
     QLabel*           m_lblDeviceName = nullptr;
     QLabel*           m_lblStatus     = nullptr;
+    QLabel*           m_updateBanner  = nullptr;   // "Update available" (GitHub)
+    class UpdateChecker* m_updater    = nullptr;
 
     // ── Renderer ────────────────────────────────────────────────────────────
     SystemSensors     m_sensors;

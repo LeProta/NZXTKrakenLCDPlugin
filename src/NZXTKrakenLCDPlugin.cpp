@@ -1,4 +1,5 @@
 #include "NZXTKrakenLCDPlugin.h"
+#include "Version.h"
 #include "ui/KrakenLCDWidget.h"
 #include <QPainter>
 #include <QFont>
@@ -264,7 +265,7 @@ OpenRGBPluginInfo NZXTKrakenLCDPlugin::GetPluginInfo()
 
     info.Name        = "NZXT Kraken LCD";
     info.Description = "Controls the LCD screen of NZXT Kraken coolers.";
-    info.Version     = "1.0.2";
+    info.Version     = NZXT_LCD_VERSION;
     info.Commit      = "release";
     info.URL         = "https://github.com/LeProta/NZXTKrakenLCDPlugin";
     info.Location    = OPENRGB_PLUGIN_LOCATION_TOP;

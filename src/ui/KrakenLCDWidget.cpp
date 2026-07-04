@@ -3,6 +3,8 @@
 #include "KrakenMediaCache.h"
 #include "KrakenUiPersistence.h"
 #include "KrakenOpenRGBSettings.h"
+#include "UpdateChecker.h"
+#include "../Version.h"
 #include "../renderer/FrameRenderer.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -445,6 +447,18 @@ KrakenLCDWidget::KrakenLCDWidget(QWidget* parent) : QWidget(parent)
             [this](const QImage& f) { if (m_preview) m_preview->setFrame(f); });
 
     m_thread->start();
+
+    // Vérification de mise à jour (GitHub releases/latest), asynchrone.
+    m_updater = new UpdateChecker(this);
+    connect(m_updater, &UpdateChecker::updateAvailable, this,
+            [this](const QString& tag, const QString& url) {
+        m_updateBanner->setText(QStringLiteral(
+            "&#128276; Update available: <b>%1</b> &mdash; "
+            "<a href=\"%2\">Download on GitHub</a>")
+            .arg(tag.toHtmlEscaped(), url.toHtmlEscaped()));
+        m_updateBanner->show();
+    });
+    m_updater->check(QStringLiteral(NZXT_LCD_VERSION));
 }
 
 KrakenLCDWidget::~KrakenLCDWidget()
@@ -519,6 +533,15 @@ void KrakenLCDWidget::buildUI()
     m_lblStatus->setStyleSheet(statusLabelStyle(m_darkTheme));
     leftCol->addWidget(m_lblDeviceName);
     leftCol->addWidget(m_lblStatus);
+
+    // Bannière de mise à jour (masquée tant qu'aucune version plus récente).
+    m_updateBanner = new QLabel;
+    m_updateBanner->setTextFormat(Qt::RichText);
+    m_updateBanner->setOpenExternalLinks(true);
+    m_updateBanner->setWordWrap(true);
+    m_updateBanner->setStyleSheet(QStringLiteral("font-size:12px;font-weight:600;"));
+    m_updateBanner->hide();
+    leftCol->addWidget(m_updateBanner);
 
     // Sélecteur de mode — signaux bloqués pendant l'ajout des items
     buildModeSelector();

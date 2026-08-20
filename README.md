@@ -1,4 +1,4 @@
-# NZXT Kraken LCD — OpenRGB Plugin
+# NZXT Kraken LCD - OpenRGB Plugin
 
 _OpenRGB plugin for the NZXT Kraken Z / Elite LCD screen._
 

@@ -1,4 +1,4 @@
-# NZXT Kraken LCD - OpenRGB Plugin
+# NZXT Kraken LCD — OpenRGB Plugin
 
 _OpenRGB plugin for the NZXT Kraken Z / Elite LCD screen._
 
@@ -96,7 +96,7 @@ Required to read CPU and motherboard temperatures (ring-0 sensor driver). Liquid
 |------|---------|
 | Visual Studio Build Tools | 2019 / 2022 — *Desktop development with C++* + *.NET Framework 4.x SDK* |
 | Qt | 5.15.2 `msvc2019_64` |
-| vcpkg | latest — provides `hidapi` and `libusb` (`x64-windows`) |
+| vcpkg | *optional* — only if you prefer system `hidapi` / `libusb` over the bundled import libraries |
 | CMake | ≥ 3.16 |
 | OpenRGB source | 0.9+ |
 
@@ -117,7 +117,9 @@ cmake --build build
 
 Output: `build/NZXTKrakenLCDPlugin.dll`.
 
-> If `hidapi` / `libusb` are not found automatically, pass the vcpkg toolchain:
+> `hidapi` and `libusb` are resolved in this order: `pkg-config`, then `find_library`,
+> then the import libraries bundled under `third_party/`. No vcpkg install is required.
+> To use your own build instead, pass the vcpkg toolchain:
 > `-DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake`
 
 > The build is forced to Release — `lhwm-cpp-wrapper.lib` is compiled with `/MD` and mixing runtimes causes `LNK2038`.
@@ -131,6 +133,7 @@ Output: `build/NZXTKrakenLCDPlugin.dll`.
 | No **NZXT Kraken LCD** tab / *"Cannot load the plugin"* | `lhwm-wrapper.dll` is missing from the OpenRGB folder. |
 | CPU temperature/clock shows 0 / N/A | Close NZXT CAM / HWiNFO / Ryzen Master; run OpenRGB as Administrator; or check that *Memory Integrity (HVCI)* / the *Vulnerable Driver Blocklist* is not blocking the sensor driver. |
 | GPU temperature/clock/load shows 0 / N/A | Make sure you have correctly installed your graphics drivers. |
+| OpenRGB dies a few seconds after startup, `0xC0000005` in `*_unloaded` | Fixed in 1.0.4 — update the plugin. The graphics driver was unloading its user-mode DLL under a sensor poll in flight. |
 
 Logs are written next to OpenRGB's own log files (`NZXTKrakenLCD_<timestamp>.log`), and make sure you have enabled logs in the OpenRGB settings for the logs to appear.
 

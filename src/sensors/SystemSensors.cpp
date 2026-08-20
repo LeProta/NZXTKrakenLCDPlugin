@@ -20,6 +20,9 @@
 #include <tuple>
 #include <initializer_list>
 #include <lhwm-cpp-wrapper.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 // =============================================================================
 namespace {
@@ -102,12 +105,29 @@ void SystemSensors::buildSensorMap()
     if (m_mapBuilt) return;
     m_mapBuilt = true;
 
+#ifdef _WIN32
+    // LHM (AmdGpu/ADL) charge le UMD D3D du pilote puis le decharge ; le poll
+    // suivant rappelle dedans -> 0xC0000005 dans "<UMD>.DLL_unloaded". On
+    // epingle les modules deja charges pour qu'ils ne soient jamais liberes.
+    // ponytail: liste fixe des UMD connus, ajouter le nom du pilote si un autre
+    // vendeur presente le meme crash.
+    auto pinLoaded = [](const wchar_t* name) {
+        HMODULE h = nullptr;
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN, name, &h);
+    };
+#endif
+
     struct Entry { std::string name, type, id; };
     std::vector<Entry> all;
 
     try {
         // [nomMateriel, [(nomCapteur, typeCapteur, identifiant), ...]]
         auto hsMap = LHWM::GetHardwareSensorMap();
+#ifdef _WIN32
+        for (const wchar_t* m : { L"amdxn64.dll", L"amdxx64.dll", L"atiadlxx.dll",
+                                  L"nvoglv64.dll", L"d3d9.dll" })
+            pinLoaded(m);
+#endif
         for (const auto& hw : hsMap) {
             for (const auto& s : hw.second) {
                 all.push_back({ std::get<0>(s), std::get<1>(s), std::get<2>(s) });

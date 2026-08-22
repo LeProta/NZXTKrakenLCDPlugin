@@ -45,6 +45,36 @@ static bool idIsRam(const std::string& id) {
     return id.rfind("/ram/", 0) == 0;
 }
 
+// --- Epinglage des UMD graphiques -------------------------------------------
+//   LHM (AmdGpu/ADL, compteurs PDH "GPU Engine") charge le user-mode driver du
+//   pilote puis le laisse se decharger ; le poll suivant rappelle dedans ->
+//   0xC0000005 dans "<UMD>.DLL_unloaded" (cf. AMDXN64.DLL). GET_MODULE_HANDLE_EX_FLAG_PIN
+//   incremente definitivement le refcount : le module ne sera plus libere.
+//   Idempotent et sans effet si le module n'est pas (encore) charge, d'ou
+//   l'appel a chaque poll tant qu'il en reste a epingler.
+#ifdef _WIN32
+static void pinGpuDriverModules()
+{
+    // ponytail: liste fixe des UMD connus ; ajouter le nom du module si un
+    // autre pilote presente le meme crash "*_unloaded".
+    static const wchar_t* kModules[] = {
+        L"amdxn64.dll", L"amdxx64.dll", L"atiadlxx.dll", L"aticfx64.dll",
+        L"nvoglv64.dll", L"nvapi64.dll", L"igd10iumd64.dll",
+        L"d3d9.dll", L"d3d11.dll", L"dxgi.dll",
+    };
+    static bool pinned[sizeof(kModules) / sizeof(kModules[0])] = {};
+
+    for (size_t i = 0; i < sizeof(kModules) / sizeof(kModules[0]); ++i) {
+        if (pinned[i]) continue;
+        HMODULE h = nullptr;
+        if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN, kModules[i], &h))
+            pinned[i] = true;   // charge et desormais epingle
+    }
+}
+#else
+static void pinGpuDriverModules() {}
+#endif
+
 } // anonymous namespace
 
 // =============================================================================
@@ -105,17 +135,6 @@ void SystemSensors::buildSensorMap()
     if (m_mapBuilt) return;
     m_mapBuilt = true;
 
-#ifdef _WIN32
-    // LHM (AmdGpu/ADL) charge le UMD D3D du pilote puis le decharge ; le poll
-    // suivant rappelle dedans -> 0xC0000005 dans "<UMD>.DLL_unloaded". On
-    // epingle les modules deja charges pour qu'ils ne soient jamais liberes.
-    // ponytail: liste fixe des UMD connus, ajouter le nom du pilote si un autre
-    // vendeur presente le meme crash.
-    auto pinLoaded = [](const wchar_t* name) {
-        HMODULE h = nullptr;
-        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN, name, &h);
-    };
-#endif
 
     struct Entry { std::string name, type, id; };
     std::vector<Entry> all;
@@ -123,11 +142,7 @@ void SystemSensors::buildSensorMap()
     try {
         // [nomMateriel, [(nomCapteur, typeCapteur, identifiant), ...]]
         auto hsMap = LHWM::GetHardwareSensorMap();
-#ifdef _WIN32
-        for (const wchar_t* m : { L"amdxn64.dll", L"amdxx64.dll", L"atiadlxx.dll",
-                                  L"nvoglv64.dll", L"d3d9.dll" })
-            pinLoaded(m);
-#endif
+        pinGpuDriverModules();
         for (const auto& hw : hsMap) {
             for (const auto& s : hw.second) {
                 all.push_back({ std::get<0>(s), std::get<1>(s), std::get<2>(s) });
@@ -210,6 +225,8 @@ void SystemSensors::buildSensorMap()
 
 void SystemSensors::pollOnce()
 {
+    pinGpuDriverModules();
+
     auto readId = [&](SensorType t, const char* unit, bool clampPct) -> SensorValue {
         const std::string id = m_ids.value(t, std::string());
         if (id.empty()) return SensorValue{};

@@ -336,7 +336,7 @@ QWidget* NZXTKrakenLCDPlugin::GetWidget()
         QStringLiteral(
             "<h1>Cannot load the plugin.</h1>"
             "<p>Make sure you downloaded "
-            "<a href=\"https://gitlab.com/OpenRGBDevelopers/lhwm-wrapper/-/jobs/artifacts/master/download?job=main_build\">lhwm-wrapper</a></p>"
+            "<a href=\"https://github.com/LeProta/lhwm-wrapper/releases\">lhwm-wrapper</a></p>"
             "<p>Place this DLL inside <b>%1</b> and restart OpenRGB.</p>")
         .arg(QCoreApplication::applicationDirPath()));
     label->setTextFormat(Qt::RichText);

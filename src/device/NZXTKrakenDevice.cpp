@@ -403,21 +403,36 @@ bool NZXTKrakenDevice::sendFrame(const QByteArray& imageData, uint8_t streamKind
     //    Le driver Python envoie TOUJOURS cette commande, même pour le V2 !
     {
         uint8_t cmd[2] = { 0x36, 0x02 };
-        sendHIDCommand(cmd, sizeof(cmd));
+        if (!sendHIDCommand(cmd, sizeof(cmd))) {
+            // Frame non finalisée : échec réel (comptabilisé par le worker pour
+            // la reconnexion) et anti-flood invalidé pour repartir proprement.
+            m_lastFrameTimeValid = false;
+            static int s_endErr = 0;
+            if (s_endErr++ < 5)
+                qWarning() << "[KrakenLCD/Frame] frame #" << idx << "end command failed.";
+            return false;
+        }
     }
 
     // 6) Attendre la réponse 0x37 0x02 (end ack)
     {
         uint8_t resp[64] = {0};
+        bool gotAck = false;
         for (int retry = 0; retry < 50 && !m_abort.load(std::memory_order_relaxed); retry++) {
             if (readHIDResponse(resp, sizeof(resp), 100)) {
                 if (resp[0] == 0x37 && resp[1] == 0x02) {
                     if (log) qDebug() << "[KrakenLCD/Frame] frame #" << idx
                                       << "end ack received, status=" << (int)resp[14];
+                    gotAck = true;
                     break;
                 }
             }
         }
+        // Ack de fin absent : signalé (borné) sans faire échouer la frame —
+        // sémantique non documentée selon les firmwares, données déjà livrées.
+        static int s_noEndAck = 0;
+        if (!gotAck && !m_abort.load(std::memory_order_relaxed) && s_noEndAck++ < 5)
+            qWarning() << "[KrakenLCD/Frame] frame #" << idx << "no end ack received (timeout).";
     }
 
     // Enregistrer le timestamp pour l'anti-flood

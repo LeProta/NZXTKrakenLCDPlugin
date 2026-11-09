@@ -7,12 +7,9 @@
 
 namespace NZXTKraken {
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
 static QString krakenBaseDir()
 {
-    // AppDataLocation → .../AppData/Roaming/OpenRGB  (quand l'hôte est OpenRGB)
     QString base = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    // Évite le doublon .../OpenRGB/OpenRGB/ si AppDataLocation ne finit pas par OpenRGB
     if (!base.endsWith(QStringLiteral("/OpenRGB"), Qt::CaseInsensitive)
         && !base.endsWith(QStringLiteral("\\OpenRGB"), Qt::CaseInsensitive))
         base += QStringLiteral("/OpenRGB");
@@ -47,11 +44,9 @@ QString KrakenMediaCache::importFile(const QString& sourcePath)
     QString destDir = mediaDirectory();
     QString destPath = destDir + QStringLiteral("/") + fi.fileName();
 
-    // Si c'est déjà dans le dossier media, on ne recopie pas
     if (QFileInfo(destPath).absoluteFilePath() == fi.absoluteFilePath())
         return destPath;
 
-    // Écrase si existe déjà
     if (QFile::exists(destPath))
         QFile::remove(destPath);
 

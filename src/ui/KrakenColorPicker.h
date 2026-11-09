@@ -10,9 +10,6 @@
 
 namespace NZXTKraken {
 
-// ───────────────────────────────────────────────────────────────────────────
-// ColorSwatchButton : bouton carré aperçu — Solid / FillOutline / Gradient
-// ───────────────────────────────────────────────────────────────────────────
 class ColorSwatchButton : public QPushButton {
     Q_OBJECT
 public:
@@ -37,9 +34,6 @@ private:
     bool          m_hovered = false;
 };
 
-// ───────────────────────────────────────────────────────────────────────────
-// SvPad : pavé 2D Saturation × Value
-// ───────────────────────────────────────────────────────────────────────────
 class SvPad : public QWidget {
     Q_OBJECT
 public:
@@ -60,9 +54,6 @@ private:
     void updateFromPos(const QPoint& p);
 };
 
-// ───────────────────────────────────────────────────────────────────────────
-// HueSlider : barre horizontale arc-en-ciel
-// ───────────────────────────────────────────────────────────────────────────
 class HueSlider : public QWidget {
     Q_OBJECT
 public:
@@ -80,9 +71,6 @@ private:
     void updateFromPos(int x);
 };
 
-// ───────────────────────────────────────────────────────────────────────────
-// CustomColorPicker : SV pad + Hue + inputs Hex/R/G/B (synchronisés)
-// ───────────────────────────────────────────────────────────────────────────
 class CustomColorPicker : public QWidget {
     Q_OBJECT
 public:
@@ -104,10 +92,6 @@ private:
     void syncInputsFromColor();
 };
 
-// ───────────────────────────────────────────────────────────────────────────
-// GradientStopsEditor : barre interactive (drag stops, clic droit ajoute,
-// drag bas supprime). Émet stopsChanged en temps réel.
-// ───────────────────────────────────────────────────────────────────────────
 class GradientStopsEditor : public QWidget {
     Q_OBJECT
 public:
@@ -136,9 +120,6 @@ private:
     int    stopAtPos(const QPoint& p) const;
 };
 
-// ───────────────────────────────────────────────────────────────────────────
-// Popover de base : QFrame frameless qui ferme sur clic extérieur + Esc
-// ───────────────────────────────────────────────────────────────────────────
 class KrakenColorPopover : public QFrame {
     Q_OBJECT
 public:
@@ -150,9 +131,6 @@ protected:
     void paintEvent(QPaintEvent*) override;
 };
 
-// ───────────────────────────────────────────────────────────────────────────
-// Popovers concrets (modal-like, retour de valeur via accept/reject)
-// ───────────────────────────────────────────────────────────────────────────
 class SolidColorPopover : public KrakenColorPopover {
     Q_OBJECT
 public:
@@ -166,13 +144,12 @@ private:
 class TextColorPopover : public KrakenColorPopover {
     Q_OBJECT
 public:
-    // Sous-onglets : fill + outline (outline peut être transparent)
     static bool pick(QWidget* anchor, QColor& fill, QColor& outline);
 private:
     TextColorPopover(const QColor& fill, const QColor& outline, QWidget* parent = nullptr);
     QColor m_fill, m_outline;
     bool   m_accepted = false;
-    int    m_subTab   = 0;   // 0 = Text (fill), 1 = Outline
+    int    m_subTab   = 0;
 };
 
 class GradientPopover : public KrakenColorPopover {
@@ -189,7 +166,6 @@ private:
 
 } // namespace NZXTKraken
 
-// ─── Accesseurs d'historique pour la persistance ────────────────────────────
 namespace NZXTKraken {
 const QList<QColor>& kColorHistory();
 const QList<GradientStops>& kGradientHistory();

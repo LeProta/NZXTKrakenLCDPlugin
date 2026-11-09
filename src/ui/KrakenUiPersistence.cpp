@@ -11,7 +11,6 @@
 
 namespace NZXTKraken {
 
-// ── Helpers JSON ─────────────────────────────────────────────────────────────
 static QJsonObject colorToJson(const QColor& c)
 {
     return QJsonObject{
@@ -69,9 +68,6 @@ static QJsonObject readingToJson(const ReadingConfig& rc)
     };
 }
 
-// jsonToReading : reconstruit un ReadingConfig depuis JSON.
-// Rétrocompat avec ancien format (colorNumber/colorText). Le caller peut
-// passer un défaut spécifique au mode (singleReading, dualReading1, etc.).
 static ReadingConfig jsonToReading(const QJsonObject& o, const ReadingConfig& fallback)
 {
     if (o.isEmpty()) return fallback;
@@ -110,7 +106,6 @@ static ReadingConfig jsonToReading(const QJsonObject& o, const ReadingConfig& fa
     return rc;
 }
 
-// Helpers ModeConfig
 static QJsonObject modeToJson(const ModeConfig& m)
 {
     return QJsonObject{
@@ -139,7 +134,7 @@ QString KrakenUiPersistence::settingsFilePath()
 
 FrameConfig KrakenUiPersistence::load()
 {
-    FrameConfig cfg;  // constructeur applique les défauts NZXT CAM
+    FrameConfig cfg;
     QString path = settingsFilePath();
 
     QFile f(path);
@@ -160,23 +155,17 @@ FrameConfig KrakenUiPersistence::load()
     QJsonObject o = doc.object();
 
     const int mRaw        = o["mode"].toInt(int(DisplayMode::SINGLE_INFOGRAPHIC));
-    const int cfgVersion  = o["cfgVersion"].toInt(1);   // 1 = ancien enum (avant fusion GIF)
+    const int cfgVersion  = o["cfgVersion"].toInt(1);
     cfg.rotation    = o["rotation"].toInt(0);
     cfg.brightness  = o["brightness"].toInt(100);
     cfg.gifPath     = o["gifPath"].toString();
     cfg.dualVertical= o["dualVertical"].toBool(true);
 
-    // Background générique (Image/GIF, Clock, Audio)
     cfg.bgColor     = jsonToColor(o["bgColor"].toObject(), Qt::black);
 
-    // ─── Migration ancien format → bundles par mode ─────────────────────────
-    // Ancien format : bgColor, logoColor, showLogo, reading1/2/3 (partagés)
-    // Nouveau format : single, dual, triple (ModeConfig) + readings par mode.
-    // Si le nouveau format est absent, on initialise depuis l'ancien.
     const bool hasNewFormat = o.contains("single") || o.contains("singleReading");
 
     if (hasNewFormat) {
-        // ─── Nouveau format : lit directement les bundles ───────────────────
         cfg.single = jsonToMode(o["single"].toObject(), cfg.single);
         cfg.dual   = jsonToMode(o["dual"].toObject(),   cfg.dual);
         cfg.triple = jsonToMode(o["triple"].toObject(), cfg.triple);
@@ -188,7 +177,6 @@ FrameConfig KrakenUiPersistence::load()
         cfg.tripleReading2  = jsonToReading(o["tripleReading2"].toObject(),  cfg.tripleReading2);
         cfg.tripleReading3  = jsonToReading(o["tripleReading3"].toObject(),  cfg.tripleReading3);
     } else {
-        // ─── Ancien format : migre vers les bundles par mode ────────────────
         const QColor oldBg   = jsonToColor(o["bgColor"].toObject(),   Qt::black);
         const QColor oldLogo = jsonToColor(o["logoColor"].toObject(), Qt::white);
         const bool   oldShow = o["showLogo"].toBool(true);
@@ -201,8 +189,6 @@ FrameConfig KrakenUiPersistence::load()
         cfg.dual   = migrated;
         cfg.triple = migrated;
 
-        // Migre reading1/2/3 → bundles par mode (chaque mode reçoit les readings
-        // qui le concernent ; les autres restent aux défauts NZXT).
         const ReadingConfig defS = cfg.singleReading;
         const ReadingConfig defD1 = cfg.dualReading1;
         const ReadingConfig defD2 = cfg.dualReading2;
@@ -215,24 +201,18 @@ FrameConfig KrakenUiPersistence::load()
         const ReadingConfig r3 = jsonToReading(o["reading3"].toObject(), defT3);
 
         cfg.singleReading  = r1;
-        cfg.dualReading1   = r1;  // dans l'ancien, reading1 servait aussi pour Dual
+        cfg.dualReading1   = r1;
         cfg.dualReading2   = (o.contains("reading2")) ? r2 : defD2;
         cfg.tripleReading1 = r1;
         cfg.tripleReading2 = r2;
         cfg.tripleReading3 = r3;
 
-        // En Dual, le colorViz par défaut était magenta — si l'utilisateur ne
-        // l'a jamais changé, on remet les défauts NZXT (CPU violet / GPU magenta).
         if (cfg.dualReading1.colorViz == QColor(0xFF, 0x00, 0xFF))
             cfg.dualReading1.colorViz = defaultDualReading1Color();
         if (cfg.dualReading2.colorViz == QColor(0xFF, 0x00, 0xFF))
             cfg.dualReading2.colorViz = defaultDualReading2Color();
     }
 
-    // ─── Mode : migration de l'ancien enum (modes *_GIF supprimés) ──────────
-    // Ancien enum : 0 Image,1 Single,2 Single+GIF,3 Dual,4 Dual+GIF,5 Triple,
-    // 6 Triple+GIF,7 Clock,8 Audio,9 NowPlaying. Nouveau : les +GIF deviennent
-    // le mode de base, en héritant de l'ancien gifPath partagé.
     if (cfgVersion >= 2) {
         cfg.mode = DisplayMode(mRaw);
     } else {
@@ -271,19 +251,16 @@ FrameConfig KrakenUiPersistence::load()
     cfg.audioLogoColor  = jsonToColor(o["audioLogoColor"].toObject(), Qt::white);
     cfg.audioShowLogo   = o.contains("audioShowLogo")
                             ? o["audioShowLogo"].toBool(true)
-                            : o["showLogo"].toBool(true);  // fallback ancien
-    cfg.audioSensitivity= float(o["audioSensitivity"].toDouble(0.5556));   // défaut -80 dB
+                            : o["showLogo"].toBool(true);
+    cfg.audioSensitivity= float(o["audioSensitivity"].toDouble(0.5556));
 
-    // Now Playing : fond propre (migration : hérite de l'ancien bgColor partagé)
     cfg.npBgColor       = jsonToColor(o["npBgColor"].toObject(),       cfg.bgColor);
-    // Now Playing : couleurs unies artiste / titre (fill + contour)
     cfg.npArtistFill    = jsonToColor(o["npArtistFill"].toObject(),    cfg.npArtistFill);
     cfg.npArtistOutline = jsonToColor(o["npArtistOutline"].toObject(), cfg.npArtistOutline);
     cfg.npTitleFill     = jsonToColor(o["npTitleFill"].toObject(),     cfg.npTitleFill);
     cfg.npTitleOutline  = jsonToColor(o["npTitleOutline"].toObject(),  cfg.npTitleOutline);
     cfg.npShowProgress  = o["npShowProgress"].toBool(true);
 
-    // ─── Restauration des couleurs récentes (max 5) ─────────────────────────────────
     if (o.contains("recentColors")) {
         QList<QColor> recents;
         QJsonArray arr = o["recentColors"].toArray();
@@ -318,14 +295,13 @@ bool KrakenUiPersistence::save(const FrameConfig& cfg)
 
     QJsonObject o;
     o["mode"]         = int(cfg.mode);
-    o["cfgVersion"]   = 2;     // enum sans les modes *_GIF (fond GIF par mode via gifPath)
+    o["cfgVersion"]   = 2;
     o["bgColor"]      = colorToJson(cfg.bgColor);
     o["rotation"]     = cfg.rotation;
     o["brightness"]   = cfg.brightness;
     o["gifPath"]      = cfg.gifPath;
     o["dualVertical"] = cfg.dualVertical;
 
-    // ─── Bundles par mode (état indépendant) ─────────────────────────────
     o["single"] = modeToJson(cfg.single);
     o["dual"]   = modeToJson(cfg.dual);
     o["triple"] = modeToJson(cfg.triple);
@@ -362,7 +338,6 @@ bool KrakenUiPersistence::save(const FrameConfig& cfg)
     o["npTitleOutline"]  = colorToJson(cfg.npTitleOutline);
     o["npShowProgress"]  = cfg.npShowProgress;
 
-    // ─── Sauvegarde des couleurs récentes (custom + presets pickés) ─────────────────
     {
         QJsonArray arr;
         for (const auto& c : kColorHistory()) arr.append(colorToJson(c));
@@ -383,8 +358,6 @@ bool KrakenUiPersistence::save(const FrameConfig& cfg)
         o["recentGradients"] = arr;
     }
 
-    // QSaveFile : écriture atomique (temp + rename). Un crash/coupure pendant
-    // l'écriture ne peut plus corrompre settings.json.
     QSaveFile f(path);
     if (!f.open(QIODevice::WriteOnly)) {
         qWarning() << "[KrakenLCD/Persistence] Cannot write" << path;

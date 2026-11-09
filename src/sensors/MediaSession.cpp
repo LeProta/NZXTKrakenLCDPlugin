@@ -23,22 +23,19 @@ static QString hstr(winrt::hstring const& h)
     return QString::fromWCharArray(h.c_str(), static_cast<int>(h.size()));
 }
 
-// TimeSpan (ticks 100 ns) -> secondes
 static double secs(winrt::Windows::Foundation::TimeSpan ts)
 {
     return std::chrono::duration<double>(ts).count();
 }
 
-// Valeurs BRUTES extraites de la session, sans logique de filtrage.
 struct RawTimeline {
-    bool   timelineValid = false;  // GetTimelineProperties a réussi
+    bool   timelineValid = false;
     bool   playing       = false;
     double rate          = 1.0;
-    double posRaw        = 0.0;    // Position - StartTime
+    double posRaw        = 0.0;
     double duration      = 0.0;    // EndTime - StartTime
 };
 
-// Lecture 100 % synchrone (aucun appel asynchrone) → utilisable à chaque frame.
 static RawTimeline readRawTimeline(GlobalSystemMediaTransportControlsSession const& session)
 {
     RawTimeline rt;
@@ -46,7 +43,7 @@ static RawTimeline readRawTimeline(GlobalSystemMediaTransportControlsSession con
         auto pinfo = session.GetPlaybackInfo();
         rt.playing = (pinfo.PlaybackStatus() ==
             GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
-        auto r = pinfo.PlaybackRate();           // IReference<double> (nullable)
+        auto r = pinfo.PlaybackRate();
         if (r) { const double rv = r.Value(); if (rv > 0.01) rt.rate = rv; }
     } catch (...) {}
 
@@ -62,14 +59,13 @@ static RawTimeline readRawTimeline(GlobalSystemMediaTransportControlsSession con
 
 struct MediaSession::Impl {
     GlobalSystemMediaTransportControlsSessionManager mgr{ nullptr };
-    QString       lastKey;       // identité du morceau courant (titre|artiste|album)
-    MediaSnapshot last;          // dernier instantané COMPLET (métadonnées + pochette)
+    QString       lastKey;
+    MediaSnapshot last;
 
-    // Horloge interne de position (par morceau).
-    double                                goodDuration = 0.0;        // dernière durée fiable
-    double                                dispPos      = 0.0;        // position affichée courante
-    std::chrono::steady_clock::time_point dispStamp{};               // instant de dispPos
-    double                                lastPosRaw   = 0.0;        // dernière Position brute vue
+    double                                goodDuration = 0.0;
+    double                                dispPos      = 0.0;
+    std::chrono::steady_clock::time_point dispStamp{};
+    double                                lastPosRaw   = 0.0;
     bool                                  haveSample   = false;
 
     bool ensureManager()
@@ -84,7 +80,7 @@ struct MediaSession::Impl {
         }
     }
 
-    void resetClock()   // à appeler au changement de morceau
+    void resetClock()
     {
         goodDuration = 0.0;
         dispPos      = 0.0;
@@ -92,21 +88,12 @@ struct MediaSession::Impl {
         haveSample   = false;
     }
 
-    // Position via une horloge monotone interne, recalée sur l'app au besoin.
-    //
-    // On fait avancer la position NOUS-MÊMES tant que ça joue (free-run) et on ne
-    // se recale sur la valeur de l'app que lorsqu'elle publie une NOUVELLE position
-    // (≠ précédente) — soit un saut net (seek), soit l'app a pris de l'avance.
-    // Conséquence : plus de gel (apps qui ne rafraîchissent pas Position après un
-    // seek, ou qui ne la fournissent pas comme Cider) ni de reculs (petit retard
-    // de l'app). La durée, elle, est maintenue (hold last-good) à travers les
-    // rapports dégénérés (durée qui retombe à ~0 juste après un seek).
     void applyTimeline(const RawTimeline& rt, MediaSnapshot& out)
     {
         const auto now = std::chrono::steady_clock::now();
         double elapsed = haveSample
             ? std::chrono::duration<double>(now - dispStamp).count() : 0.0;
-        if (elapsed < 0.0 || elapsed > 3600.0) elapsed = 0.0;   // garde-fou (veille…)
+        if (elapsed < 0.0 || elapsed > 3600.0) elapsed = 0.0;
 
         out.playing      = rt.playing;
         out.playbackRate = rt.rate;
@@ -114,15 +101,15 @@ struct MediaSession::Impl {
         const bool degenerate = rt.timelineValid && (rt.duration <= 0.5) && (goodDuration > 0.5);
         if (rt.timelineValid && rt.duration > 0.5) goodDuration = rt.duration;
 
-        double disp = dispPos + (rt.playing ? elapsed * rt.rate : 0.0);   // free-run
+        double disp = dispPos + (rt.playing ? elapsed * rt.rate : 0.0);
         if (rt.timelineValid && !degenerate) {
             const double app = rt.posRaw;
             if (!haveSample) {
-                disp = app;                                    // 1ère valeur → ancrage
-            } else if (std::fabs(app - lastPosRaw) > 0.05) {   // l'app a publié du neuf
+                disp = app;
+            } else if (std::fabs(app - lastPosRaw) > 0.05) {
                 const bool seek     = std::fabs(app - disp) > 3.0;
                 const bool appAhead = app > disp + 0.25;
-                if (seek || appAhead) disp = app;              // sinon on garde le free-run (pas de recul)
+                if (seek || appAhead) disp = app;
             }
         }
 
@@ -151,16 +138,11 @@ bool MediaSession::poll(MediaSnapshot& out)
 
         auto session = d->mgr.GetCurrentSession();
         if (!session) {
-            out.active = false;     // rien ne joue
+            out.active = false;
             d->last    = out;
             return true;
         }
 
-        // Métadonnées (titre / artiste / album) + pochette — appel asynchrone.
-        // Attente BORNÉE (400 ms) : poll() tourne sur le thread de rendu ;
-        // un .get() non borné pouvait bloquer la frame plusieurs centaines de
-        // ms quand l'app média est lente à répondre. En cas de dépassement on
-        // ressert le dernier instantané complet et on réessaiera au tick suivant.
         auto propsOp = session.TryGetMediaPropertiesAsync();
         if (propsOp.wait_for(std::chrono::milliseconds(400))
                 != winrt::Windows::Foundation::AsyncStatus::Completed) {
@@ -175,7 +157,6 @@ bool MediaSession::poll(MediaSnapshot& out)
         out.artist = hstr(props.Artist());
         out.album  = hstr(props.AlbumTitle());
 
-        // Changement de morceau : reset de l'horloge interne + re-décodage pochette.
         const QString key = out.title + QChar(0x1F) + out.artist + QChar(0x1F) + out.album;
         if (key != d->lastKey) {
             d->resetClock();
@@ -209,7 +190,7 @@ bool MediaSession::poll(MediaSnapshot& out)
         out.cover  = d->last.cover;
         out.active = true;
 
-        d->last = out;   // mémorise l'instantané complet (base pour pollTimeline)
+        d->last = out;
         return true;
     } catch (...) {
         out.active = false;
@@ -222,23 +203,23 @@ bool MediaSession::pollTimeline(MediaSnapshot& out)
     out = MediaSnapshot{};
     try {
         if (!d->mgr)
-            return false;                         // pas encore initialisé → attend poll()
+            return false;
 
         auto session = d->mgr.GetCurrentSession();
         if (!session) {
-            out.active     = false;               // lecture arrêtée
+            out.active     = false;
             d->last.active = false;
             return true;
         }
         if (!d->last.active) {
-            out = d->last;                        // métadonnées pas encore connues → attend poll()
+            out = d->last;
             return true;
         }
 
-        out = d->last;                            // métadonnées + pochette en cache
+        out = d->last;
         d->applyTimeline(readRawTimeline(session), out);
 
-        d->last.positionSec  = out.positionSec;   // base fraîche
+        d->last.positionSec  = out.positionSec;
         d->last.durationSec  = out.durationSec;
         d->last.playing      = out.playing;
         d->last.playbackRate = out.playbackRate;
@@ -249,7 +230,7 @@ bool MediaSession::pollTimeline(MediaSnapshot& out)
     }
 }
 
-#else  // ── Non-Windows : implémentation neutre ──────────────────────────────
+#else
 
 struct MediaSession::Impl {};
 MediaSession::MediaSession()  : d(std::make_unique<Impl>()) {}

@@ -20,66 +20,41 @@
 #include <windows.h>
 #endif
 
-// ============================================================================
-//  Logging du plugin, integre aux reglages d'OpenRGB
-//  ------------------------------------------------------------------------
-//  Le plugin ne peut PAS appeler le LogManager d'OpenRGB directement : sous
-//  Windows il faudrait linker OpenRGB.exe (dont les symboles ne sont pas
-//  exportes), ce que ce plugin autonome evite volontairement. A la place on
-//  installe un handler de messages Qt qui REPRODUIT le comportement et le
-//  format d'OpenRGB :
-//    * lit OpenRGB.json (section "LogManager") pour respecter les cases
-//      "Enable Log File" / "Enable Log Console", le "loglevel" et le
-//      "file_count_limit" ;
-//    * ecrit dans le dossier logs/ d'OpenRGB, avec le meme schema de nom
-//      (NZXTKrakenLCD_<AAAAMMJJ_HHMMSS>.log, comme OpenRGB_<...>.log) ;
-//    * meme entete (lignes indentees + separateur de 100 '=') et meme format
-//      de ligne :  <ms>  |<Code>  <message>  ;
-//    * applique la rotation par file_count_limit (comme OpenRGB) ;
-//    * filtre par niveau (meme logique qu'OpenRGB) ;
-//    * relaie au handler precedent les messages des autres composants.
-// ============================================================================
 namespace {
 
-// Niveaux alignes sur LogManager.h d'OpenRGB (enum LL_*)
 enum { KL_FATAL = 0, KL_ERROR = 1, KL_WARNING = 2, KL_INFO = 3,
        KL_VERBOSE = 4, KL_DEBUG = 5, KL_TRACE = 6 };
 
 QFile*           g_logFile        = nullptr;
 QtMessageHandler g_prevHandler    = nullptr;
 QMutex           g_logMutex;
-QElapsedTimer    g_clock;                  // base du compteur ms (comme base_clock d'OpenRGB)
+QElapsedTimer    g_clock;
 bool             g_installed      = false;
-bool             g_pinnedInChain  = false; // resté chaîné en relai (DLL épinglée)
-bool             g_fileEnabled    = true;  // defaut OpenRGB : fichier ON
-bool             g_consoleEnabled = false; // defaut OpenRGB : console OFF
+bool             g_pinnedInChain  = false;
+bool             g_fileEnabled    = true;
+bool             g_consoleEnabled = false;
 int              g_logLevel       = KL_INFO;
-int              g_fileCountLimit = 0;     // 0 = pas de limite (defaut OpenRGB)
+int              g_fileCountLimit = 0;
 
-// ── Dossier de configuration d'OpenRGB (contient OpenRGB.json et logs/) ──────
 QString openRGBConfigDir()
 {
-    // 1) Mode portable : OpenRGB.json a cote de l'executable
     const QString exeDir = QCoreApplication::applicationDirPath();
     if (QFileInfo::exists(exeDir + QStringLiteral("/OpenRGB.json")))
         return exeDir;
 
-    // 2) Emplacement standard Windows : %APPDATA%/OpenRGB
     const QString appdata = qEnvironmentVariable("APPDATA");
     if (!appdata.isEmpty())
         return appdata + QStringLiteral("/OpenRGB");
 
-    // 3) Repli generique multiplateforme
     return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
            + QStringLiteral("/OpenRGB");
 }
 
-// ── Reglages de log depuis OpenRGB.json (section "LogManager") ───────────────
 void loadOpenRGBLogSettings(const QString& cfgDir)
 {
     QFile f(cfgDir + QStringLiteral("/OpenRGB.json"));
     if (!f.open(QIODevice::ReadOnly))
-        return;   // OpenRGB.json introuvable -> on garde les defauts d'OpenRGB
+        return;
 
     const QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
     if (!doc.isObject())
@@ -108,7 +83,6 @@ int levelForType(QtMsgType t)
     }
 }
 
-// Codes EXACTEMENT identiques a ceux d'OpenRGB (LogManager::log_codes)
 const char* levelCode(int lvl)
 {
     switch (lvl) {
@@ -122,16 +96,11 @@ const char* levelCode(int lvl)
     }
 }
 
-// Premier segment du tag entre crochets : identifie les messages du plugin.
-// Préfixe UNIQUE "KrakenLCD" : les anciens tags génériques ([USB], [HID],
-// [Device]...) capturaient — et perdaient — les logs d'OpenRGB et des autres
-// plugins qui utilisent les mêmes tags.
 bool isPluginTag(const QString& root)
 {
     return root == QLatin1String("KrakenLCD");
 }
 
-// Ecriture bas niveau (entete + lignes deja formatees), thread-safe
 void writeRaw(const QString& text)
 {
     QMutexLocker lk(&g_logMutex);
@@ -149,8 +118,6 @@ void writeRaw(const QString& text)
 
 void krakenMessageHandler(QtMsgType type, const QMessageLogContext& ctx, const QString& msg)
 {
-    // Tag [Sous-systeme] en tete : le premier segment sert au routage, mais on
-    // n'affiche que le dernier ([KrakenLCD/WinHID] -> [WinHID], [Sensors] -> [Sensors]).
     QString tag;
     int close = -1;
     if (msg.startsWith('[')) {
@@ -160,7 +127,6 @@ void krakenMessageHandler(QtMsgType type, const QMessageLogContext& ctx, const Q
     const int firstSlash = tag.indexOf('/');
     const QString root = (firstSlash >= 0) ? tag.left(firstSlash) : tag;
 
-    // Message qui ne vient pas du plugin (ou plugin dechargé) -> relai au handler precedent
     if (!g_installed || tag.isEmpty() || !isPluginTag(root)) {
         if (g_prevHandler) g_prevHandler(type, ctx, msg);
         else               fprintf(stderr, "%s\n", qPrintable(msg));
@@ -168,15 +134,13 @@ void krakenMessageHandler(QtMsgType type, const QMessageLogContext& ctx, const Q
     }
 
     const int lvl = levelForType(type);
-    if (lvl > g_logLevel) return;   // filtrage par niveau, identique a OpenRGB
+    if (lvl > g_logLevel) return;
 
-    // Ne garder que l'element concerne dans le tag affiche
     const int lastSlash = tag.lastIndexOf('/');
     const QString shortTag = (lastSlash >= 0) ? tag.mid(lastSlash + 1) : tag;
     const QString outMsg = QStringLiteral("[") + shortTag + QStringLiteral("] ")
                            + msg.mid(close + 1).trimmed();
 
-    // Format OpenRGB :  "<ms_left6>|<Code_left9><message>"
     const qint64 ms = g_clock.isValid() ? g_clock.elapsed() : 0;
     writeRaw(QStringLiteral("%1|%2%3")
                  .arg(QString::number(ms).leftJustified(6),
@@ -184,16 +148,14 @@ void krakenMessageHandler(QtMsgType type, const QMessageLogContext& ctx, const Q
                       outMsg));
 }
 
-// Rotation des logs du plugin (memes regles qu'OpenRGB::rotate_logs)
 void rotatePluginLogs(const QString& logsDir)
 {
-    if (g_fileCountLimit < 1) return;   // 0/absent = pas de limite (defaut OpenRGB)
+    if (g_fileCountLimit < 1) return;
     QDir d(logsDir);
-    // Tri par nom = tri chronologique (horodatage AAAAMMJJ_HHMMSS en tete)
     const QStringList files = d.entryList(QStringList()
                                   << QStringLiteral("NZXTKrakenLCD_*.log"),
                                   QDir::Files, QDir::Name);
-    int removeCount = files.size() - g_fileCountLimit + 1;  // +1 : place pour le nouveau
+    int removeCount = files.size() - g_fileCountLimit + 1;
     for (int i = 0; i < removeCount && i < files.size(); ++i)
         QFile::remove(d.filePath(files[i]));
 }
@@ -217,14 +179,13 @@ void installKrakenLogger(const QString& hidVer)
         if (!g_logFile->open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
             delete g_logFile;
             g_logFile     = nullptr;
-            g_fileEnabled = false;   // dossier non inscriptible -> on desactive le fichier
+            g_fileEnabled = false;
         }
     }
 
-    if (!g_pinnedInChain)   // sinon déjà dans la chaîne : ne pas boucler sur nous-mêmes
+    if (!g_pinnedInChain)
         g_prevHandler = qInstallMessageHandler(krakenMessageHandler);
 
-    // Entete, meme forme qu'OpenRGB (lignes indentees + separateur de 100 '=')
     writeRaw(QStringLiteral("    NZXT Kraken LCD plugin v" NZXT_LCD_VERSION));
     writeRaw(QStringLiteral("    hidapi %1 | Qt %2").arg(hidVer, QString::fromLatin1(qVersion())));
     writeRaw(QStringLiteral("    OpenRGB config: %1").arg(cfgDir));
@@ -240,14 +201,8 @@ void installKrakenLogger(const QString& hidVer)
 void uninstallKrakenLogger()
 {
     if (!g_installed) return;
-    // Restauration respectueuse de la chaîne : si un autre composant a
-    // installé SON handler APRÈS le nôtre, le remplacer aveuglément par
-    // g_prevHandler l'éjecterait. Dans ce cas on remet le sien en place.
     QtMessageHandler cur = qInstallMessageHandler(g_prevHandler);
     if (cur != krakenMessageHandler) {
-        // Ce handler (ex. plugin Pump) peut relayer vers le nôtre : décharger la
-        // DLL lui laisserait un pointeur pendant (crash au log suivant). On
-        // reste chaîné en relai pur (g_installed = false) et on épingle la DLL.
         qInstallMessageHandler(cur);
         g_pinnedInChain = true;
 #ifdef _WIN32
@@ -286,7 +241,6 @@ OpenRGBPluginInfo NZXTKrakenLCDPlugin::GetPluginInfo()
     info.Label       = "NZXT Kraken LCD";
     info.TabIconString = "";
 
-    // Icône 64×64 générée sans fichier externe
     QImage icon(64, 64, QImage::Format_ARGB32);
     icon.fill(Qt::black);
     {
@@ -322,10 +276,6 @@ void NZXTKrakenLCDPlugin::Load(ResourceManagerInterface* /*rm*/)
     qInfo() << "[KrakenLCD/Core] Plugin loaded.";
 
 #ifdef _WIN32
-    // lhwm-wrapper.dll (assembly .NET de LibreHardwareMonitor) doit être à côté
-    // d'OpenRGB.exe. La lib statique liée le charge au runtime : on ne crée donc
-    // le widget (qui démarre les capteurs) QUE si la DLL est présente. Sinon
-    // GetWidget() renvoie un message d'installation, sans rien appeler côté LHWM.
     const bool lhwmPresent =
         QFileInfo::exists(QCoreApplication::applicationDirPath()
                           + QStringLiteral("/lhwm-wrapper.dll"));
@@ -333,7 +283,7 @@ void NZXTKrakenLCDPlugin::Load(ResourceManagerInterface* /*rm*/)
         qWarning() << "[KrakenLCD/Core] lhwm-wrapper.dll not found in"
                    << QCoreApplication::applicationDirPath()
                    << "— widget disabled (install message shown).";
-        return;   // m_widget reste nullptr -> GetWidget() affiche le message
+        return;
     }
 #endif
 
@@ -345,7 +295,6 @@ QWidget* NZXTKrakenLCDPlugin::GetWidget()
 {
     if (m_widget) return m_widget;
 
-    // lhwm-wrapper.dll absente → message global (comme le plugin Hardware Fan Sync).
     QLabel* label = new QLabel(
         QStringLiteral(
             "<h1>Cannot load the plugin.</h1>"

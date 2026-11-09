@@ -16,26 +16,20 @@
 
 namespace NZXTKraken {
 
-// ─── Polices héritées (utilisées pour CLOCKFACE et AUDIO_VISUAL) ─────────────
 static const QFont FONT_NZXT  ("Arial",     1);
 
-// ─── Design tokens NZXT (d'après nzxt-cam-lcd.jsx) ───────────────────────────
 static const QColor NZXT_WHITE (0xFF, 0xFF, 0xFF);
 static const QColor NZXT_TRACK (0x1E, 0x1E, 0x22);
 static const QColor NZXT_CPU   (0x7C, 0x3A, 0xED);
 static const QColor NZXT_GPU   (0xE0, 0x40, 0xFB);
 
-// ─── Angles d'arc partagés Mode 1 & 3 (clock degrees : 0 = 12h) ──────────────
 static constexpr float ARC_START   = 220.f;
 static constexpr float ARC_SWEEP   = 280.f;
 static constexpr float ARC_END     = ARC_START + ARC_SWEEP;
 static constexpr float ARC_GAP_DEG = 10.f;
 
-// ─── Fabrique de police (Barlow → fallback Segoe UI) ─────────────────────────
 static QFont nzxtFont(int px, QFont::Weight w = QFont::Medium)
 {
-    // Resolution Barlow -> fallback Segoe UI faite UNE seule fois (QFontInfo
-    // interroge la base de polices ; evite des centaines de lookups/s a 60 fps).
     static const QString family = []{
         return QFontInfo(QFont(QStringLiteral("Barlow"))).exactMatch()
                    ? QStringLiteral("Barlow")
@@ -47,7 +41,6 @@ static QFont nzxtFont(int px, QFont::Weight w = QFont::Medium)
     return f;
 }
 
-// ─── Géométrie ───────────────────────────────────────────────────────────────
 static inline QPointF clockToCart(qreal cx, qreal cy, qreal r, qreal clockDeg)
 {
     const qreal rad = clockDeg * M_PI / 180.0;
@@ -71,7 +64,6 @@ static void drawClockArc(QPainter& p, const QRectF& rect,
     clockArcToQt(clockStart, clockEnd, start16, span16);
     p.drawArc(rect, start16, span16);
 }
-// Variante avec un QBrush quelconque (gradient ou solid) en stroke
 static void drawClockArcBrush(QPainter& p, const QRectF& rect,
                               qreal clockStart, qreal clockEnd,
                               const QBrush& brush, qreal thickness)
@@ -88,9 +80,6 @@ static void drawClockArcBrush(QPainter& p, const QRectF& rect,
 enum class UnitKind  { Temp, Load, ClockMHz, ClockGHz, None };
 enum class TextAlign { Start, Middle, End };
 
-// Unité de température : écrite depuis l'UI (LanguageChange), lue au rendu
-// (thread worker) -> atomic. L'arc/jauge reste sur la valeur brute en °C ;
-// seul le NOMBRE affiché est converti.
 static std::atomic<bool> g_fahrenheit{false};
 
 static inline float maybeToFahrenheit(float v, SensorType t)
@@ -128,13 +117,9 @@ static QString formatNumber(const SensorValue& sv, SensorType t, bool ghz)
     if (!sv.available) return QStringLiteral("--");
     if (ghz && (t == SensorType::CPU_CLOCK || t == SensorType::GPU_CLOCK))
         return QString::number(sv.value / 1000.f, 'f', 1);
-    // lround : arrondi correct aussi pour les valeurs negatives
-    // (int(v + 0.5f) arrondissait -0.6 vers 0)
     return QString::number(std::lround(maybeToFahrenheit(sv.value, t)));
 }
 
-// ─── Dessin texte avec fill + outline (paint-order: stroke puis fill) ────────
-// Si outline.alpha() == 0, équivaut à un drawText simple (chemin rapide).
 static void drawStyledText(QPainter& p, const QRectF& rect, int alignFlags,
                            const QString& text, const QFont& font,
                            const QColor& fill, const QColor& outline)
@@ -164,7 +149,6 @@ static void drawStyledText(QPainter& p, const QRectF& rect, int alignFlags,
     QPainterPath path;
     path.addText(x, baseline, font, text);
 
-    // Stroke d'abord (sous le fill), épaisseur proportionnelle au rayon
     const qreal strokeW = LCD_R * 0.006;
     QPen pen(outline, strokeW, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
     pen.setMiterLimit(2);
@@ -172,11 +156,9 @@ static void drawStyledText(QPainter& p, const QRectF& rect, int alignFlags,
     p.setBrush(Qt::NoBrush);
     p.drawPath(path);
 
-    // Fill par-dessus
     p.fillPath(path, fill);
 }
 
-// ─── Horloge monotone (ms) pour les animations (défilement Now Playing) ──────
 static qint64 animNowMs()
 {
     using namespace std::chrono;
@@ -184,11 +166,6 @@ static qint64 animNowMs()
                steady_clock::now().time_since_epoch()).count();
 }
 
-// ─── Texte défilant en va-et-vient (marquee bidirectionnel) ──────────────────
-// Si le texte tient dans viewportW → centré (statique). Sinon : pause au début
-// (1er mot visible), défilement jusqu'au dernier mot, pause, retour au 1er mot,
-// puis la boucle recommence. Le rendu est découpé (clip) à la fenêtre visible
-// pour ne jamais déborder du cercle. elapsedMs = temps écoulé depuis l'ancre.
 static void drawScrollingText(QPainter& p, qreal cx, qreal centerY, qreal bandH,
                               qreal viewportW, const QString& text, const QFont& font,
                               const QColor& fill, const QColor& outline, qint64 elapsedMs)
@@ -200,7 +177,6 @@ static void drawScrollingText(QPainter& p, qreal cx, qreal centerY, qreal bandH,
     const qreal vpLeft = cx - viewportW / 2.0;
     const qreal topY   = centerY - bandH / 2.0;
 
-    // Tient dans la largeur → centré, pas de défilement.
     if (textW <= viewportW) {
         drawStyledText(p, QRectF(vpLeft, topY, viewportW, bandH),
                        Qt::AlignHCenter | Qt::AlignVCenter, text, font, fill, outline);
@@ -208,23 +184,23 @@ static void drawScrollingText(QPainter& p, qreal cx, qreal centerY, qreal bandH,
     }
 
     const qreal  overflow = textW - viewportW;
-    const qreal  speed    = LCD_R * 0.18;                       // ~58 px/s sur le canvas 640 (vitesse constante)
-    const qint64 pauseMs  = 1300;                               // pause à chaque extrémité
+    const qreal  speed    = LCD_R * 0.18;
+    const qint64 pauseMs  = 1300;
     const qint64 scrollMs = (qint64)(1000.0 * overflow / std::max(1.0, speed));
     const qint64 cycle    = pauseMs + scrollMs + pauseMs + scrollMs;
 
     const qint64 t = (cycle > 0) ? (elapsedMs % cycle) : 0;
     qreal off;
     if (t < pauseMs) {
-        off = 0.0;                                              // début (1er mot)
+        off = 0.0;
     } else if (t < pauseMs + scrollMs) {
         const qreal u = double(t - pauseMs) / double(std::max<qint64>(1, scrollMs));
-        off = u * overflow;                                     // → vitesse constante vers le dernier mot
+        off = u * overflow;
     } else if (t < pauseMs + scrollMs + pauseMs) {
-        off = overflow;                                         // fin (dernier mot)
+        off = overflow;
     } else {
         const qreal u = double(t - pauseMs - scrollMs - pauseMs) / double(std::max<qint64>(1, scrollMs));
-        off = (1.0 - u) * overflow;                             // ← retour au 1er mot (vitesse constante)
+        off = (1.0 - u) * overflow;
     }
 
     p.save();
@@ -234,9 +210,6 @@ static void drawScrollingText(QPainter& p, qreal cx, qreal centerY, qreal bandH,
     p.restore();
 }
 
-// ─── Dessin valeur + unité, version étendue (fill + outline) ─────────────────
-// Si forceShowUnit == false, l'unité est masquée — utile quand le capteur
-// n'a pas encore chargé (valeur "--") pour éviter d'afficher "% / °C / GHz".
 static void drawMetric(QPainter& p, qreal x, qreal y,
                        const QString& numStr,
                        int numPx, int unitPx,
@@ -291,19 +264,16 @@ static void drawMetric(QPainter& p, qreal x, qreal y,
             break;
         case TextAlign::Middle:
         default: {
-            // Centre uniquement les chiffres ; l'unité déborde à droite.
             numX  = x - numW / 2.0;
             unitX = numX + numW + SYMBOL_GAP;
             break;
         }
     }
 
-    // Nombre
     QRectF numRect(numX, y - numPx, numW + 2, numPx * 2.0);
     drawStyledText(p, numRect, Qt::AlignLeft | Qt::AlignVCenter,
                    numStr, fNum, fillColor, outlineColor);
 
-    // Unité
     if (!unitStr.isEmpty()) {
         qreal unitY = y;
         if (unitOnTop) unitY = y - numPx * 0.30;
@@ -314,7 +284,6 @@ static void drawMetric(QPainter& p, qreal x, qreal y,
     }
 }
 
-// ─── GIF helpers ─────────────────────────────────────────────────────────────
 static bool isGifFile(const QString& path)
 {
     return path.endsWith(".gif", Qt::CaseInsensitive);
@@ -327,9 +296,6 @@ FrameRenderer::FrameRenderer(SystemSensors* sensors) : m_sensors(sensors)
 }
 FrameRenderer::~FrameRenderer() = default;
 
-// Helper : retourne le ModeConfig actif pour les modes infographic.
-// Pour les autres modes (Image/GIF, Clock, Audio), retourne single par défaut
-// (mais ces modes utilisent cfg.bgColor explicitement, pas activeMode).
 const ModeConfig& FrameRenderer::activeMode(const FrameConfig& cfg)
 {
     switch (cfg.mode) {
@@ -368,18 +334,12 @@ QImage FrameRenderer::render(const FrameConfig& cfg)
     const QImage* staticImg = nullptr;
 
     if (usesMedia && !mediaPath.isEmpty()) {
-        // Resolution media memoisee tant que le chemin ne change pas : evite une
-        // std::string + des lookups map a chaque frame (le chemin ne change qu'au
-        // choix d'un fichier). m_gifCache/m_imageCache restent proprietaires ; on
-        // ne garde qu'un pointeur (stable car std::map ne deplace pas ses noeuds).
         if (mediaPath != m_lastMediaPath) {
             m_lastMediaPath = mediaPath;
             m_lastGif       = nullptr;
             m_lastStaticImg = nullptr;
             m_gifScaled     = QPixmap();
             m_gifScaledNo   = -1;
-            // Purge des medias precedents : sans ca les caches grossissaient
-            // indefiniment (un GIF CacheAll = toutes ses frames decodees en RAM).
             m_gifCache.clear();
             m_imageCache.clear();
             const std::string key = mediaPath.toStdString();
@@ -407,14 +367,7 @@ QImage FrameRenderer::render(const FrameConfig& cfg)
         gif       = m_lastGif;
         staticImg = m_lastStaticImg;
 
-        // L'animation est pilotee par QMovie lui-meme (timer interne sur le
-        // thread du worker) : les delais propres au GIF sont respectes.
-        // L'ancien jumpToFrame(m_gifFrame++) avancait d'une frame par tick de
-        // rendu -> vitesse fausse (calee sur les fps de l'ecran, pas du GIF).
     } else if (!m_lastMediaPath.isEmpty()) {
-        // Media plus utilise (mode sans media, ou chemin vide via "Remove") :
-        // purge. Detruit aussi le QMovie -> son timer interne s'arrete, plus
-        // de decodage GIF en arriere-plan.
         m_lastMediaPath.clear();
         m_lastGif       = nullptr;
         m_lastStaticImg = nullptr;
@@ -445,10 +398,6 @@ QImage FrameRenderer::render(const FrameConfig& cfg)
         case DisplayMode::NOW_PLAYING:  renderNowPlaying(p, cfg);  break;
     }
 
-    // Luminosite : geree UNIQUEMENT en materiel (commande HID 0x30 0x02).
-    // L'ancien voile noir logiciel ici s'ajoutait a la luminosite materielle
-    // -> attenuation appliquee deux fois (50% percu comme ~25%).
-
     p.end();
     return img;
 }
@@ -464,14 +413,9 @@ QByteArray FrameRenderer::toJpeg(const QImage& img, int quality)
 
 QByteArray FrameRenderer::toQ565(const QImage& img)
 {
-    // Buffer reutilise d'une frame a l'autre (toQ565 n'est appele que depuis le
-    // thread worker, sequentiellement) : evite une alloc/free de ~2 Mio par frame.
-    // Q565_Encoder::encode fait resize(0) puis append -> la capacite est conservee.
-    // Le retour partage le buffer en COW ; la frame precedente est detruite avant
-    // le prochain appel, donc le resize(0) reste en place (refcount 1, pas de detach).
     thread_local QByteArray out;
     if (out.capacity() < (1 << 21))
-        out.reserve(1 << 21);   // ~2 MiB, superieur au pire cas (une seule fois)
+        out.reserve(1 << 21);
     Q565_Encoder::encode(img, &out);
     return out;
 }
@@ -485,17 +429,12 @@ void FrameRenderer::setAudioLevels(const QVector<float>& bands)
 
 void FrameRenderer::setMediaInfo(const MediaSnapshot& snap)
 {
-    // Appelé sur le thread du worker (même thread que render) — pas de mutex requis.
     m_media = snap;
 }
 
-// ─── Fond ────────────────────────────────────────────────────────────────────
-// Le fond utilise le ModeConfig actif pour les modes infographic, et cfg.bgColor
-// pour les autres (Image/GIF, Clock, Audio).
 void FrameRenderer::renderBackground(QPainter& p, const FrameConfig& cfg,
                                      QMovie* gif, const QImage* staticImg)
 {
-    // 1. Couleur de fond unie (base) — toujours dessinée d'abord.
     QColor bg = cfg.bgColor;
     switch (cfg.mode) {
         case DisplayMode::SINGLE_INFOGRAPHIC: bg = cfg.single.bgColor; break;
@@ -506,12 +445,8 @@ void FrameRenderer::renderBackground(QPainter& p, const FrameConfig& cfg,
     }
     p.fillRect(0, 0, LCD_W, LCD_H, bg);
 
-    // 2. Image/GIF par-dessus la couleur unie, s'il y en a une.
     bool drewMedia = false;
     if (gif) {
-        // Mise a l'echelle memoisee par numero de frame : a 60 fps de rendu et
-        // ~10 fps de GIF, l'ancien scaled() par tick refaisait 6x le meme
-        // redimensionnement SmoothTransformation (~ms par frame 640x640).
         const int fno = gif->currentFrameNumber();
         if (fno != m_gifScaledNo || m_gifScaled.isNull()) {
             QPixmap frame = gif->currentPixmap();
@@ -520,8 +455,6 @@ void FrameRenderer::renderBackground(QPainter& p, const FrameConfig& cfg,
                     Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
                 m_gifScaledNo = fno;
             } else {
-                // Raté de décodage : ne pas dessiner une frame périmée (même
-                // comportement qu'avant le cache — fond uni, pas de voile).
                 m_gifScaled   = QPixmap();
                 m_gifScaledNo = -1;
             }
@@ -537,7 +470,6 @@ void FrameRenderer::renderBackground(QPainter& p, const FrameConfig& cfg,
         drewMedia = true;
     }
 
-    // 3. Voile sombre pour la lisibilité des stats (modes infographic uniquement).
     if (drewMedia && cfg.mode != DisplayMode::IMAGE_GIF)
         p.fillRect(0, 0, LCD_W, LCD_H, QColor(0, 0, 0, 140));
 }
@@ -549,8 +481,6 @@ void FrameRenderer::circularClip(QPainter& p)
     p.setClipPath(path);
 }
 
-// renderLogo : prend désormais un ModeConfig au lieu de la config globale.
-// Chaque mode infographic appelle cette fonction avec son propre bundle.
 void FrameRenderer::renderLogo(QPainter& p, const ModeConfig& mode)
 {
     if (!mode.showLogo) return;
@@ -563,8 +493,6 @@ void FrameRenderer::renderLogo(QPainter& p, const ModeConfig& mode)
                    QStringLiteral("NZXT"), f,
                    mode.logoColor, QColor(0,0,0,0));
 }
-
-// drawGaugeArc / drawSensorReading : stubs vides supprimes (jamais appeles).
 
 QString FrameRenderer::formatValue(float v, SensorType t) const
 {
@@ -606,7 +534,6 @@ QString FrameRenderer::getShortLabel(SensorType t) const
     }
 }
 
-// ─── Helper pour générer un dégradé assombri (fond des jauges) ───────────────
 static GradientStops createDarkenedStops(const GradientStops& original, float factor = 0.25f) {
     GradientStops darkened;
     for (const auto& stop : original) {
@@ -620,10 +547,6 @@ static GradientStops createDarkenedStops(const GradientStops& original, float fa
     return darkened;
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// MODE 1 — SINGLE INFOGRAPHIC
-// (utilise cfg.singleReading + cfg.single ModeConfig — état indépendant du mode Triple)
-// ═════════════════════════════════════════════════════════════════════════════
 void FrameRenderer::renderSingleInfographic(QPainter& p, const FrameConfig& cfg)
 {
     const auto& rc = cfg.singleReading;
@@ -648,26 +571,17 @@ void FrameRenderer::renderSingleInfographic(QPainter& p, const FrameConfig& cfg)
     QConicalGradient grad = makeArcConicalGradient(QPointF(cx, cy), stops,
                                                     ARC_START, ARC_SWEEP);
 
-    // ─── CORRECTION DU GAP ET DE LA BOULE ────────────────────────────────────
-    // 1. Si le capteur n'est pas disponible, le gap est de 0 (le fond gris est entier).
-    // 2. Si le capteur est disponible, on applique strictement l'écart constant (10°).
     float currentGap = sv.available ? ARC_GAP_DEG : 0.f;
 
-    // Dessin du fond : même dégradé que la jauge mais assombri (effet de
-    // voile) pour matérialiser visuellement la zone non remplie.
     GradientStops bgStops = createDarkenedStops(stops);
     QConicalGradient bgGrad = makeArcConicalGradient(QPointF(cx, cy), bgStops,
                                                      ARC_START, ARC_SWEEP);
     drawClockArcBrush(p, arcRect, valAngle + currentGap, ARC_END,
                       QBrush(bgGrad), thick);
 
-    // Dessin de la jauge et de la boule (uniquement s'il y a une valeur lisible)
     if (sv.available) {
-        // La jauge colorée s'arrête 10° AVANT la valeur, 
-        // pour laisser la boule isolée au milieu de son espace !
         drawClockArcBrush(p, arcRect, ARC_START, valAngle - ARC_GAP_DEG, QBrush(grad), thick);
 
-        // La boule est dessinée à sa position exacte et redevient visible
         const QColor dotCol = colorAtPercent(stops, pct);
         const QPointF dotPos = clockToCart(cx, cy, arcR, valAngle);
         p.setBrush(dotCol);
@@ -683,7 +597,6 @@ void FrameRenderer::renderSingleInfographic(QPainter& p, const FrameConfig& cfg)
     else if (len == 3) { valPx = int(LCD_R * 0.58); degPx = int(LCD_R * 0.14); }
     else               { valPx = int(LCD_R * 0.68); degPx = int(LCD_R * 0.17); }
 
-    // forceShowUnit = sv.available — masque °/%/GHz quand pas de lecture
     drawMetric(p, cx, cy, numStr, valPx, degPx,
                rc.numberFill, rc.numberOutline, unit, TextAlign::Middle,
                sv.available);
@@ -705,10 +618,6 @@ void FrameRenderer::renderSingleInfographic(QPainter& p, const FrameConfig& cfg)
                    label, fl, lblFill, rc.textOutline);
 } // 
 
-// ═════════════════════════════════════════════════════════════════════════════
-// MODE 2 — DUAL INFOGRAPHIC
-// (utilise cfg.dualReading1/2 + cfg.dual ModeConfig)
-// ═════════════════════════════════════════════════════════════════════════════
 void FrameRenderer::renderDualInfographic(QPainter& p, const FrameConfig& cfg)
 {
     const auto& rc1 = cfg.dualReading1;
@@ -759,10 +668,8 @@ void FrameRenderer::renderDualInfographic(QPainter& p, const FrameConfig& cfg)
         const qreal rightX = cx + LCD_R * 0.40;
         const qreal blockY = cy + LCD_R * 0.06;
         const qreal valueY = blockY - LCD_R * 0.03;
-        const qreal labelY = blockY + LCD_R * 0.27;   // un peu plus d'air que 0.24, sans trop ecarter
+        const qreal labelY = blockY + LCD_R * 0.27;
 
-        // L'unité MHz est toujours masquée pour les clocks (affichage trop large).
-        // Autres unités : seulement si le capteur a une valeur lisible.
         const bool showU1 = sv1.available && (u1 != UnitKind::ClockMHz);
         const bool showU2 = sv2.available && (u2 != UnitKind::ClockMHz);
 
@@ -785,7 +692,6 @@ void FrameRenderer::renderDualInfographic(QPainter& p, const FrameConfig& cfg)
         return;
     }
 
-    // ───── HORIZONTAL : 2 barres empilées ───────────────────────────────────
     const qreal barW = LCD_R * 1.25;
     const qreal barH = LCD_R * 0.09;
     const qreal barRx = barH / 2.0;
@@ -849,13 +755,8 @@ void FrameRenderer::renderDualInfographic(QPainter& p, const FrameConfig& cfg)
     drawMetric(p, rightEdge, botValY, botNum, valFont, degSize,
                rc2.numberFill, rc2.numberOutline, botUnit, TextAlign::End,
                sv2.available);
-    // Pas de logo NZXT en mode Dual horizontal (cf. JSX).
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// MODE 3 — TRIPLE INFOGRAPHIC
-// (utilise cfg.tripleReading1/2/3 + cfg.triple ModeConfig — état indépendant du mode Single)
-// ═════════════════════════════════════════════════════════════════════════════
 void FrameRenderer::renderTripleInfographic(QPainter& p, const FrameConfig& cfg)
 {
     const auto& rcM = cfg.tripleReading1;
@@ -888,18 +789,14 @@ void FrameRenderer::renderTripleInfographic(QPainter& p, const FrameConfig& cfg)
 
     const float valAngle = ARC_START + ARC_SWEEP * pctM / 100.f;
     
-    // ─── CORRECTION DU GAP ET DE LA BARRE (TRIPLE) ───────────────────────────
     float currentGap = svM.available ? ARC_GAP_DEG : 0.f;
 
-    // Fond : même dégradé que la barre mais assombri (effet de voile)
-    // pour matérialiser visuellement la zone non remplie.
     GradientStops bgStops = createDarkenedStops(stops);
     QConicalGradient bgGrad = makeArcConicalGradient(QPointF(cx, cy), bgStops,
                                                      ARC_START, ARC_SWEEP);
     drawClockArcBrush(p, arcRect, valAngle + currentGap, ARC_END,
                       QBrush(bgGrad), thick);
 
-    // Barre colorée et Boule
     if (svM.available) {
         drawClockArcBrush(p, arcRect, ARC_START, valAngle, QBrush(grad), thick);
 
@@ -909,17 +806,12 @@ void FrameRenderer::renderTripleInfographic(QPainter& p, const FrameConfig& cfg)
         p.drawEllipse(dotPos, dotR, dotR);
     }
 
-    // ─── Tailles de police ───────────────────────────────────────────────
-    // Le nombre primaire ET les nombres secondaires retrecissent selon leur
-    // nombre de chiffres ; les labels gardent leur taille fixe.
     const int mLen = numM.length();
     int mFont, mDeg;
     if (mLen >= 4)      { mFont = int(LCD_R * 0.38); mDeg = int(LCD_R * 0.09); }
     else if (mLen == 3) { mFont = int(LCD_R * 0.48); mDeg = int(LCD_R * 0.11); }
     else                { mFont = int(LCD_R * 0.60); mDeg = int(LCD_R * 0.135); }
 
-    // Secondaire/tertiaire : meme logique que le primaire (le chiffre diminue
-    // avec sa longueur), label fixe et chiffre aligne a gauche (TextAlign::Start).
     auto secSize = [](const QString& s) -> std::pair<int,int> {
         const int len = s.length();
         if (len >= 4) return { int(LCD_R * 0.16), int(LCD_R * 0.05)  };
@@ -934,9 +826,6 @@ void FrameRenderer::renderTripleInfographic(QPainter& p, const FrameConfig& cfg)
     const bool showUT = svT.available && (uT != UnitKind::ClockMHz);
     const bool showUB = svB.available && (uB != UnitKind::ClockMHz);
 
-    // ─── Recentrage horizontal du bloc (primaire | separateur | secondaires) ─
-    // On mesure la largeur reellement dessinee de chaque element puis on decale
-    // tout le bloc pour que son milieu tombe sur cx (l'arc reste centre).
     auto metricW = [](const QString& num, int numPx, int unitPx,
                       UnitKind unit, bool showUnit) -> qreal {
         qreal w = QFontMetricsF(nzxtFont(numPx)).horizontalAdvance(num);
@@ -954,14 +843,12 @@ void FrameRenderer::renderTripleInfographic(QPainter& p, const FrameConfig& cfg)
         return QFontMetricsF(nzxtFont(px, QFont::Medium)).horizontalAdvance(s);
     };
 
-    // Ancres de base (avant recentrage)
-    const qreal leftX0  = cx - LCD_R * 0.32;        // centre du primaire (nombre + label)
-    const qreal sepX0   = cx + LCD_R * 0.16;        // separateur vertical
-    const qreal rightX0 = sepX0 + LCD_R * 0.08;     // depart (gauche) des secondaires
+    const qreal leftX0  = cx - LCD_R * 0.32;
+    const qreal sepX0   = cx + LCD_R * 0.16;
+    const qreal rightX0 = sepX0 + LCD_R * 0.08;
 
-    // Etendues horizontales du bloc.
     const qreal numWM    = QFontMetricsF(nzxtFont(mFont)).horizontalAdvance(numM);
-    const qreal unitWM   = metricW(numM, mFont, mDeg, uM, showUM) - numWM;  // overhang unite (droite)
+    const qreal unitWM   = metricW(numM, mFont, mDeg, uM, showUM) - numWM;
     const qreal halfLblM = labelW(lblM, int(LCD_R * 0.14)) / 2.0;
     const qreal primaryLeft  = leftX0 - std::max(numWM / 2.0, halfLblM);
     const qreal primaryRight = leftX0 + std::max(numWM / 2.0 + unitWM, halfLblM);
@@ -972,14 +859,12 @@ void FrameRenderer::renderTripleInfographic(QPainter& p, const FrameConfig& cfg)
                                   labelW(lblB, secLbl));
     const qreal secRight = rightX0 + std::max(lineWT, lineWB);
 
-    // Milieu du bloc ramene sur cx (primaryRight ne depasse pas le bloc secondaire).
     const qreal ox = cx - (primaryLeft + secRight) / 2.0;
 
     const qreal leftX  = leftX0  + ox;
     const qreal sepX   = sepX0   + ox;
     const qreal rightX = rightX0 + ox;
 
-    // ─── Separateur vertical ─────────────────────────────────────────────
     const qreal sepTop = cy - LCD_R * 0.22;
     const qreal sepBot = cy + LCD_R * 0.37;
     {
@@ -989,7 +874,6 @@ void FrameRenderer::renderTripleInfographic(QPainter& p, const FrameConfig& cfg)
         p.drawLine(QPointF(sepX, sepTop), QPointF(sepX, sepBot));
     }
 
-    // ─── Primaire (nombre centre + label centre sous lui) ────────────────
     drawMetric(p, leftX, cy, numM, mFont, mDeg,
                rcM.numberFill, rcM.numberOutline, uM, TextAlign::Middle, showUM);
 
@@ -999,7 +883,6 @@ void FrameRenderer::renderTripleInfographic(QPainter& p, const FrameConfig& cfg)
                    Qt::AlignHCenter | Qt::AlignVCenter,
                    lblM, fL, clM, rcM.textOutline);
 
-    // ─── Secondaire + tertiaire (chiffres alignes a gauche, labels fixes) ─
     const qreal secTopY = cy - LCD_R * 0.14;
     const qreal secBotY = cy + LCD_R * 0.18;
     drawMetric(p, rightX, secTopY, numT, secValT, secDegT,
@@ -1020,9 +903,6 @@ void FrameRenderer::renderTripleInfographic(QPainter& p, const FrameConfig& cfg)
     renderLogo(p, cfg.triple);
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// CLOCKFACE
-// ═════════════════════════════════════════════════════════════════════════════
 void FrameRenderer::renderClock(QPainter& p, const FrameConfig& cfg)
 {
     QTime now = QTime::currentTime();
@@ -1032,19 +912,15 @@ void FrameRenderer::renderClock(QPainter& p, const FrameConfig& cfg)
 
     const QPointF center(LCD_W / 2.0, LCD_H / 2.0);
 
-    // ═══ STYLE 1 — ARC DÉGRADÉ ═══════════════════════════════════════
-    // Le dégradé conique remplit tout l'écran : il démarre devant l'aiguille
-    // (heures), fait le tour (360°) et se termine derrière (couture sur l'aiguille).
     if (cfg.clockStyle == 1) {
         const qreal R = LCD_R * 0.985;
-        const float handClock = hourFrac * 30.f;          // tour complet en 12 h
+        const float handClock = hourFrac * 30.f;
 
         GradientStops stops = cfg.clockArcStops.isEmpty()
                             ? defaultClockArcStops() : cfg.clockArcStops;
         std::sort(stops.begin(), stops.end(),
                   [](const GradStop& a, const GradStop& b){ return a.offset < b.offset; });
 
-        // Conique plein tour : offset 0 devant l'aiguille, 100 derrière (couture).
         const float qtStart = std::fmod(90.f - handClock + 7200.f, 360.f);
         QConicalGradient cg(center, qtStart);
         for (const auto& s : stops)
@@ -1053,24 +929,20 @@ void FrameRenderer::renderClock(QPainter& p, const FrameConfig& cfg)
         QPainterPath disk; disk.addEllipse(center, R, R);
         p.fillPath(disk, QBrush(cg));
 
-        // Aiguille (ligne fine centre → bord)
         const QPointF tip = clockToCart(center.x(), center.y(), R, handClock);
         p.setPen(QPen(cfg.clockArcDial, std::max(2.0, LCD_R * 0.013),
                       Qt::SolidLine, Qt::RoundCap));
         p.drawLine(center, tip);
 
-        // Texte hh / mm près de la pointe de l'aiguille
         int hr = now.hour();
         if (!cfg.clockArc24h) { hr %= 12; if (hr == 0) hr = 12; }
         const QString hh = QStringLiteral("%1").arg(hr, 2, 10, QChar('0'));
         const QString mm = QStringLiteral("%1").arg(now.minute(), 2, 10, QChar('0'));
 
-        // Texte fixe sur la droite : centré horizontalement entre le centre de
-        // l'horloge et le bord droit, et centré verticalement.
         const qreal ax = center.x() + R * 0.5;
         const qreal ay = center.y();
         const int hPx = int(LCD_R * 0.28), mPx = int(LCD_R * 0.24);
-        const int hBox = int(hPx * 1.5), mBox = int(mPx * 1.6);   // boîtes hautes : pas de rognage
+        const int hBox = int(hPx * 1.5), mBox = int(mPx * 1.6);
         QColor mmCol = cfg.clockArcText; mmCol.setAlphaF(0.85);
         drawStyledText(p, QRectF(ax - 160, ay - hBox, 320, hBox),
                        Qt::AlignHCenter | Qt::AlignBottom, hh, nzxtFont(hPx, QFont::Bold),
@@ -1081,8 +953,6 @@ void FrameRenderer::renderClock(QPainter& p, const FrameConfig& cfg)
         return;
     }
 
-    // ═══ STYLE 2 — DIGITAL ══════════════════════════════════════════
-    // Gros chiffres hh au-dessus de mm, un seul dégradé vertical (haut → bas).
     if (cfg.clockStyle == 2) {
         p.fillRect(0, 0, LCD_W, LCD_H, cfg.clockDigitalBg);
         int hr = now.hour();
@@ -1097,7 +967,7 @@ void FrameRenderer::renderClock(QPainter& p, const FrameConfig& cfg)
 
         const int px = int(LCD_R * 0.82);
         QFont fHH = nzxtFont(px, QFont::Bold);
-        QFont fMM = nzxtFont(px, QFont::Normal);   // minutes : pas en gras
+        QFont fMM = nzxtFont(px, QFont::Normal);
         QFontMetricsF fmHH(fHH), fmMM(fMM);
         const qreal capH = fmHH.capHeight();
         const qreal gap  = capH * 0.12;
@@ -1118,11 +988,10 @@ void FrameRenderer::renderClock(QPainter& p, const FrameConfig& cfg)
         return;
     }
 
-    // ═══ STYLE 0 — ANALOGIQUE À POINTS (défaut) — fond = bgColor ═════════════════
-    const float R = LCD_R * 0.95f;                 // remplit l'écran
+    const float R = LCD_R * 0.95f;
     for (int i = 0; i < 60; i++) {
         float angle = i * 6.f * M_PI / 180.f;
-        float r     = LCD_R * 0.96f;   // anneau au plus près du bord (bord ext. des points ≈ arc single/dual/triple)
+        float r     = LCD_R * 0.96f;
         float x = center.x() + std::sin(angle) * r;
         float y = center.y() - std::cos(angle) * r;
         float dotR = (i % 5 == 0) ? 8.f : 3.5f;
@@ -1139,18 +1008,12 @@ void FrameRenderer::renderClock(QPainter& p, const FrameConfig& cfg)
     };
     drawHand(hourFrac * 30.f,       R * 0.52f, 11, cfg.clockDial);
     drawHand(minFrac  * 6.f,        R * 0.75f, 8,  cfg.clockDial);
-    drawHand(float(now.second()) * 6.f, R * 0.83f, 3, cfg.clockSeconds);  // tic discret, aligné sur les points
+    drawHand(float(now.second()) * 6.f, R * 0.83f, 3, cfg.clockSeconds);
 
     p.setBrush(cfg.clockDial); p.setPen(Qt::NoPen);
     p.drawEllipse(center, 10.0, 10.0);
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// AUDIO VISUAL
-// ═════════════════════════════════════════════════════════════════════════════
-// Contour POLYGONAL reliant les sommets par des segments droits.
-// (Mode connecté — volontairement très peu arrondi : on relie directement les
-// pics, ce qui donne une forme anguleuse / dentelée plutôt qu'un blob lisse.)
 static QPainterPath nzxtPolygonClosedPath(const QList<QPointF>& pts)
 {
     QPainterPath path;
@@ -1172,7 +1035,6 @@ void FrameRenderer::renderAudioVisual(QPainter& p, const FrameConfig& cfg)
     const QPointF center(LCD_W / 2.0, LCD_H / 2.0);
     const int   N = bands.size();
 
-    // Dégradé horizontal gauche→droite (mêmes presets que single/triple).
     GradientStops stops = cfg.audioStops.isEmpty() ? defaultVizStops() : cfg.audioStops;
     std::sort(stops.begin(), stops.end(),
               [](const GradStop& a, const GradStop& b){ return a.offset < b.offset; });
@@ -1180,8 +1042,6 @@ void FrameRenderer::renderAudioVisual(QPainter& p, const FrameConfig& cfg)
     for (const auto& s : stops)
         grad.setColorAt(std::clamp(s.offset / 100.f, 0.f, 1.f), s.color);
 
-    // ── Sensibilité = simple GAIN (0 au silence quoi qu'il arrive) ──
-    // audioSensitivity 0 (Low, -30 dB) → gain 0.5 ; 1 (High, -120 dB) → gain 8.
     const float gain = 0.5f * std::pow(16.f, std::clamp(cfg.audioSensitivity, 0.f, 1.f));
     QVector<float> amps(N);
     float sum = 0.f, peak = 0.f;
@@ -1193,10 +1053,8 @@ void FrameRenderer::renderAudioVisual(QPainter& p, const FrameConfig& cfg)
     const float meanAmp = (N > 0) ? sum / float(N) : 0.f;
     const float level   = std::clamp(meanAmp * 0.55f + peak * 0.45f, 0.f, 1.f);
 
-    // Géométrie du "waveform" radial : petit au repos, piques nets vers le bord
-    // (calé sur le rendu NZXT CAM).
-    const float restR = 42.f;                         // rayon au silence (petit cercle)
-    const float reach = float(LCD_R) - restR - 8.f;   // extension max des piques
+    const float restR = 42.f;
+    const float reach = float(LCD_R) - restR - 8.f;
 
     auto buildContour = [&]() -> QPainterPath {
         QList<QPointF> pts; pts.reserve(N);
@@ -1224,8 +1082,6 @@ void FrameRenderer::renderAudioVisual(QPainter& p, const FrameConfig& cfg)
         }
     };
 
-    // ── Waveform (calé sur NZXT CAM) ──
-    // invert  : fond couleur, forme NOIRE ; !invert : fond noir, forme en COULEUR.
     p.setPen(Qt::NoPen);
     if (cfg.audioInvert) {
         p.fillRect(0, 0, LCD_W, LCD_H, QBrush(grad));
@@ -1238,14 +1094,11 @@ void FrameRenderer::renderAudioVisual(QPainter& p, const FrameConfig& cfg)
         else                    drawBars(QBrush(grad));
     }
 
-    // ── Pastille centrale RÉACTIVE + logo NZXT ──
-    // Le centre respire avec le son (et se déforme légèrement en mode connecté).
-    // Rayon neutre agrandi.
-    const float centerMinR = 75.f;                       // cercle neutre (agrandi)
-    const float centerR    = centerMinR + level * 32.f;  // respire ~75 → ~107
+    const float centerMinR = 75.f;
+    const float centerR    = centerMinR + level * 32.f;
     QPainterPath centerPath;
     if (cfg.audioConnected) {
-        const float lightSpike = 16.f;   // déformation légère (plus douce que les pics)
+        const float lightSpike = 16.f;
         QList<QPointF> cpts; cpts.reserve(N);
         for (int i = 0; i < N; ++i) {
             float angle = float(i) / N * 2.f * float(M_PI) - float(M_PI) / 2.f;
@@ -1259,15 +1112,12 @@ void FrameRenderer::renderAudioVisual(QPainter& p, const FrameConfig& cfg)
     }
     p.setPen(Qt::NoPen);
     if (cfg.audioInvert) {
-        // Invert : centre noir.
         p.setBrush(Qt::black);
         p.drawPath(centerPath);
     } else {
-        // Non-invert : au repos le centre est COMPLÈTEMENT noir ; le voile coloré
-        // n'apparaît qu'avec le son, en fondu (transition douce).
         p.setBrush(QBrush(grad));
-        p.drawPath(centerPath);                                      // couleur sous le voile
-        int veilA = int(std::clamp(1.f - level, 0.f, 1.f) * 255.f);  // 255 (silence) → 0 (fort)
+        p.drawPath(centerPath);
+        int veilA = int(std::clamp(1.f - level, 0.f, 1.f) * 255.f);
         if (veilA > 0) {
             p.setBrush(QColor(0, 0, 0, veilA));
             p.drawPath(centerPath);
@@ -1275,7 +1125,7 @@ void FrameRenderer::renderAudioVisual(QPainter& p, const FrameConfig& cfg)
     }
 
     if (cfg.audioShowLogo) {
-        int px = int(30.f + level * 4.f);   // quasi constant (léger pouls)
+        int px = int(30.f + level * 4.f);
         QFont f = FONT_NZXT; f.setPixelSize(px); f.setBold(true);
         f.setLetterSpacing(QFont::AbsoluteSpacing, 4);
         p.setFont(f); p.setPen(cfg.audioLogoColor);
@@ -1285,11 +1135,6 @@ void FrameRenderer::renderAudioVisual(QPainter& p, const FrameConfig& cfg)
     }
 }
 
-// ═════════════════════════════════════════════════════════════════
-// NOW PLAYING (musique via SMTC)
-//   Disposition : artiste (haut) → pochette (centre) → barre + timestamp
-//   (sous la pochette) → titre (sous le timestamp). Fond = cfg.bgColor.
-// ═════════════════════════════════════════════════════════════════
 void FrameRenderer::renderNowPlaying(QPainter& p, const FrameConfig& cfg)
 {
     const QColor fg = NZXT_WHITE;
@@ -1306,14 +1151,11 @@ void FrameRenderer::renderNowPlaying(QPainter& p, const FrameConfig& cfg)
         return;
     }
 
-    // Largeur utile (corde du cercle) à une hauteur y.
     auto widthAt = [&](qreal y) -> qreal {
         const qreal dy = std::abs(y - cy);
         if (dy >= LCD_R) return 0.0;
         return 2.0 * std::sqrt(double(LCD_R) * double(LCD_R) - double(dy) * double(dy));
     };
-    // Défilement va-et-vient : ancre temps réinitialisée au changement de piste,
-    // pour que titre/artiste repartent du début à chaque nouveau morceau.
     const QString trackKey = m.artist + QChar(0x1F) + m.title;
     if (trackKey != m_npScrollKey) {
         m_npScrollKey      = trackKey;
@@ -1321,7 +1163,6 @@ void FrameRenderer::renderNowPlaying(QPainter& p, const FrameConfig& cfg)
     }
     const qint64 npElapsed = animNowMs() - m_npScrollAnchorMs;
 
-    // ── Pochette (centre, légèrement relevée) ──
     const qreal coverSize = LCD_R * 0.88;
     const qreal coverCY   = cy - LCD_R * 0.10;
     const QRectF coverRect(cx - coverSize / 2.0, coverCY - coverSize / 2.0,
@@ -1347,7 +1188,6 @@ void FrameRenderer::renderNowPlaying(QPainter& p, const FrameConfig& cfg)
                        note, QColor(0, 0, 0, 0));
     }
 
-    // ── Artiste (au-dessus de la pochette) ──
     {
         const qreal y = coverRect.top() - LCD_R * 0.15;
         QFont f = nzxtFont(int(LCD_R * 0.095), QFont::Medium);
@@ -1355,7 +1195,6 @@ void FrameRenderer::renderNowPlaying(QPainter& p, const FrameConfig& cfg)
                           m.artist, f, cfg.npArtistFill, cfg.npArtistOutline, npElapsed);
     }
 
-    // ── Barre de progression + temps (seulement si activé ET durée connue) ──
     const bool showProgress = cfg.npShowProgress && (m.durationSec > 0.5);
     qreal titleY;
 
@@ -1390,12 +1229,9 @@ void FrameRenderer::renderNowPlaying(QPainter& p, const FrameConfig& cfg)
         }
         titleY = barY + barH + LCD_R * 0.265;
     } else {
-        // Pas de barre/temps (média sans durée, ou option désactivée) → titre
-        // rapproché sous la pochette.
         titleY = coverRect.bottom() + LCD_R * 0.20;
     }
 
-    // ── Titre ──
     {
         const qreal y = titleY;
         QFont f = nzxtFont(int(LCD_R * 0.11), QFont::DemiBold);
@@ -1421,7 +1257,5 @@ std::unique_ptr<QMovie> FrameRenderer::loadGif(const QString& path)
     qDebug() << "[KrakenLCD/Renderer] GIF loaded:" << path << "— frames:" << m->frameCount();
     return m;
 }
-
-// drawNZXTLogo : stub vide supprime (jamais appele).
 
 } // namespace NZXTKraken

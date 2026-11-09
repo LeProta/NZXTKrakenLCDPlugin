@@ -1,7 +1,3 @@
-// Banc de mesure du pipeline LCD sans matériel : rendu QPainter, mise à
-// l'échelle 640 -> 480 (Z / Elite 360 / 2023), encodage Q565 (Elite V2) / JPEG.
-// Même enchaînement que KrakenWorker::renderTick, envoi USB exclu.
-//   bench_render.exe [frames] [image.png]
 #include <QGuiApplication>
 #include <QElapsedTimer>
 #include <QImage>
@@ -48,7 +44,6 @@ int main(int argc, char** argv)
     QGuiApplication app(argc, argv);
     const int frames = argc > 1 ? atoi(argv[1]) : 200;
 
-    // Image de test (photo-like : dégradés + bruit) si aucune fournie
     QTemporaryDir tmp;
     QString img = argc > 2 ? QString::fromLocal8Bit(argv[2]) : tmp.filePath("test.png");
     if (argc <= 2) {
@@ -59,7 +54,7 @@ int main(int argc, char** argv)
         im.save(img);
     }
 
-    SystemSensors sensors;   // valeurs par défaut, pas de polling LHM
+    SystemSensors sensors;
     FrameRenderer r(&sensors);
 
     struct Case { const char* name; FrameConfig cfg; };
@@ -74,7 +69,7 @@ int main(int argc, char** argv)
     std::printf("%-20s %9s %9s %9s %9s %11s %11s\n", "mode (ms/frame)", "render", "q565", "scale480", "jpeg480",
                 "q565 bytes", "jpeg bytes");
     for (const Case& k : cases) {
-        run(r, k.cfg, 5);   // chauffe (polices, caches)
+        run(r, k.cfg, 5);
         const Stat s = run(r, k.cfg, frames);
         std::printf("%-20s %9.2f %9.2f %9.2f %9.2f %11lld %11lld\n", k.name, s.render, s.q565,
                     s.scale, s.jpeg, s.q565Bytes, s.jpegBytes);

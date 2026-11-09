@@ -18,13 +18,11 @@
 #  include <audioclient.h>
 #  include <mmreg.h>
 #  include <ks.h>
-#  include <ksmedia.h>   // KSDATAFORMAT_SUBTYPE_IEEE_FLOAT (WAVE_FORMAT_EXTENSIBLE)
+#  include <ksmedia.h>
 #endif
 
 namespace NZXTKraken {
 
-// Fond ANIMÉ (GIF) : seul cas média qui justifie la cadence max de l'écran.
-// Une image fixe rendue à 60 Hz renvoyait la même frame (~690 Ko en Q565) 60×/s.
 static bool modeUsesMedia(const FrameConfig& cfg)
 {
     const auto isGif = [](const QString& p) { return p.endsWith(QLatin1String(".gif"), Qt::CaseInsensitive); };
@@ -51,16 +49,13 @@ FrameConfig KrakenWorker::currentConfig()
     return m_cfg;
 }
 
-// Ouverture complète : device + réglages initiaux + signal UI + cadence.
-// Utilisé au démarrage ET par la reconnexion à chaud (renderTick).
 bool KrakenWorker::tryOpenDevice()
 {
     if (!m_device->open()) return false;
     const FrameConfig cfg = currentConfig();
     m_device->setBrightness(cfg.brightness);
-    // (rotation : logicielle, appliquée par le renderer via cfg.rotation)
     emit deviceOpened(QString::fromStdString(m_device->deviceName()), true);
-    applyCadence();   // reprend la cadence de l'écran du modèle détecté
+    applyCadence();
     m_sendFailCount = 0;
     return true;
 }
@@ -71,36 +66,26 @@ void KrakenWorker::setConfig(const FrameConfig& cfg)
     {
         QMutexLocker lk(&m_cfgMutex);
         modeChanged = (cfg.mode != m_cfg.mode)
-                   || (modeUsesMedia(cfg) != modeUsesMedia(m_cfg));   // GIF <-> fixe
+                   || (modeUsesMedia(cfg) != modeUsesMedia(m_cfg));
         m_cfg = cfg;
     }
-    // La cadence + WASAPI dépendent du mode et du fond (GIF ou non) : on
-    // (re)calcule sur le thread du worker (applyCadence touche le QTimer, qui a
-    // son affinité sur ce thread).
     if (modeChanged)
         QMetaObject::invokeMethod(this, "applyCadence", Qt::QueuedConnection);
 }
 
-// ── Démarrage (sur le thread du worker, via QThread::started) ───────────────
 void KrakenWorker::start()
 {
 #ifdef _WIN32
-    // COM pour WMI (capteurs) + WASAPI, sur CE thread. MTA = pas de pompe de
-    // messages requise. On n'équilibre par CoUninitialize que si on a réellement
-    // initialisé (S_OK) ; S_FALSE/RPC_E_CHANGED_MODE → on ne reprend pas de réf.
     HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     m_comInit = (hr == S_OK);
 #endif
 
-    // Unité de température : suit la locale/langue OpenRGB (°F si region US).
     FrameRenderer::setFahrenheit(OpenRGBSettings::prefersFahrenheit());
 
     const bool ok = tryOpenDevice();
     if (!ok)
         emit deviceOpened(QStringLiteral("No Kraken LCD device detected"), false);
 
-    // Capteurs demarres MEME sans Kraken : l'apercu UI (infographics) doit
-    // afficher CPU/GPU/RAM, pas des "--" partout.
     m_sensors->startPolling();
 
     m_renderTimer = new QTimer(this);
@@ -116,7 +101,6 @@ void KrakenWorker::start()
             << "\u2014 render/sensor loops running";
 }
 
-// ── Arrêt (BlockingQueuedConnection depuis le destructeur du widget) ────────
 void KrakenWorker::stop()
 {
     qInfo() << "[KrakenLCD/Worker] stopping (timers, sensors, device)";
@@ -125,8 +109,8 @@ void KrakenWorker::stop()
 #ifdef _WIN32
     closeWasapi();
 #endif
-    if (m_sensors) m_sensors->shutdown();   // stoppe le timer + libère les providers COM, SUR CE thread
-    if (m_device)  m_device->close();        // ferme sur le thread qui a ouvert (cohérence libusb/WinHID)
+    if (m_sensors) m_sensors->shutdown();
+    if (m_device)  m_device->close();
 #ifdef _WIN32
     if (m_comInit) { CoUninitialize(); m_comInit = false; }
 #endif
@@ -137,7 +121,6 @@ void KrakenWorker::setBrightness(int percent)
     if (m_device) m_device->setBrightness(percent);
 }
 
-// ── Cadence de rendu + (dé)activation WASAPI selon le mode ──────────────────
 void KrakenWorker::applyCadence()
 {
     if (!m_renderTimer) return;
@@ -150,26 +133,22 @@ void KrakenWorker::applyCadence()
 
     const int devFps   = (m_device->isOpen() && m_device->info() && m_device->info()->maxFps > 0)
                            ? m_device->info()->maxFps : 30;
-    const int screenMs = std::max(1, 1000 / devFps);   // période de l'écran du modèle
+    const int screenMs = std::max(1, 1000 / devFps);
 
     int interval;
-    if (cfg.mode == DisplayMode::AUDIO_VISUAL) interval = screenMs;            // plein régime (≤ écran)
+    if (cfg.mode == DisplayMode::AUDIO_VISUAL) interval = screenMs;
     else if (modeUsesMedia(cfg)
              || cfg.mode == DisplayMode::NOW_PLAYING
-             || cfg.mode == DisplayMode::CLOCKFACE) interval = screenMs;  // GIF/horloge/musique : cadence max de l'ecran
-    else                                       interval = std::max(screenMs, 200); // statique ~5 fps
+             || cfg.mode == DisplayMode::CLOCKFACE) interval = screenMs;
+    else                                       interval = std::max(screenMs, 200);
 
     m_renderTimer->setInterval(interval);
 }
 
-// ── Boucle de rendu : rend → (preview) → encode → envoie, tout sur ce thread ─
 void KrakenWorker::renderTick()
 {
     const FrameConfig cfg = currentConfig();
 
-    // Mode musique : timeline (position/lecture) rafraîchie à chaque frame pour un
-    // timestamp fluide qui suit aussi les seeks (appel synchrone léger ; les
-    // métadonnées + pochette restent gérées au rythme lent de sensorTick).
     if (cfg.mode == DisplayMode::NOW_PLAYING) {
         MediaSnapshot snap;
         m_media.pollTimeline(snap);
@@ -178,9 +157,6 @@ void KrakenWorker::renderTick()
 
 #ifdef _WIN32
     if (cfg.mode == DisplayMode::AUDIO_VISUAL) {
-        // Re-init throttlée (~2 s) si la capture est tombée (changement de
-        // périphérique de sortie) : sans ça le visualiseur restait mort
-        // jusqu'au prochain changement de mode.
         if (!m_wasapiReady
             && (!m_wasapiRetryClock.isValid() || m_wasapiRetryClock.elapsed() >= 2000)) {
             m_wasapiRetryClock.restart();
@@ -193,10 +169,8 @@ void KrakenWorker::renderTick()
 
     QImage frame = m_renderer.render(cfg);
 
-    // Apercu UI plafonne a ~30 fps (decouple de la cadence device) : l'UI n'a pas
-    // besoin de plus, et ca evite d'inonder le thread UI quand l'ecran tourne a 60 fps.
     if (!m_previewClock.isValid() || m_previewClock.elapsed() >= 33) {
-        emit previewReady(frame);   // copie COW vers l'UI (QueuedConnection)
+        emit previewReady(frame);
         m_previewClock.restart();
     }
 
@@ -210,11 +184,9 @@ void KrakenWorker::renderTick()
                            ? FrameRenderer::toQ565(target)
                            : FrameRenderer::toJpeg(target, 90);
 
-        if (m_device->sendFrame(payload)) {   // bloquant — mais HORS du thread UI
+        if (m_device->sendFrame(payload)) {
             m_sendFailCount = 0;
         } else if (++m_sendFailCount >= 3) {
-            // Device décroché (câble, reset USB, veille) : on ferme et on
-            // repasse par la reconnexion périodique ci-dessous.
             m_sendFailCount = 0;
             m_device->close();
             m_reopenDelayMs = 3000;
@@ -223,27 +195,20 @@ void KrakenWorker::renderTick()
             qWarning() << "[KrakenLCD/Worker] device unresponsive — closed, will retry every 3 s";
         }
     } else {
-        // Reconnexion à chaud : sondage léger (hid_enumerate) ; open() complet
-        // seulement si un Kraken est présent. Si présent mais non ouvrable
-        // (NZXT CAM lancé, canal occupé), backoff 3 s → 30 s pour ne pas
-        // remplir le log de warnings d'open() raté.
         if (!m_reopenClock.isValid() || m_reopenClock.elapsed() >= m_reopenDelayMs) {
             m_reopenClock.restart();
             if (NZXTKrakenDevice::anySupportedPresent()) {
                 if (tryOpenDevice()) m_reopenDelayMs = 3000;
                 else m_reopenDelayMs = std::min(m_reopenDelayMs * 2, 30000);
             } else {
-                m_reopenDelayMs = 3000;   // absent = sondage silencieux, pas de backoff
+                m_reopenDelayMs = 3000;
             }
         }
     }
 }
 
-// ── Lecture capteurs HID du Kraken (température liquide / RPM) ───────────────
 void KrakenWorker::sensorTick()
 {
-    // Mode musique : on rafraîchit le "now playing" (SMTC) ~1×/s. Indépendant
-    // du device (l'aperçu UI fonctionne aussi sans Kraken branché).
     if (currentConfig().mode == DisplayMode::NOW_PLAYING) {
         MediaSnapshot snap;
         m_media.poll(snap);
@@ -253,7 +218,7 @@ void KrakenWorker::sensorTick()
     if (!m_device || !m_device->isOpen()) return;
     DeviceReadings r;
     if (m_device->readSensors(r)) {
-        if (m_sensors) m_sensors->setLiquidTemp(r.liquidTemp);   // brut °C (capteurs/arcs)
+        if (m_sensors) m_sensors->setLiquidTemp(r.liquidTemp);
         const bool fahr  = FrameRenderer::fahrenheit();
         const double liq = fahr ? r.liquidTemp * 9.0 / 5.0 + 32.0 : r.liquidTemp;
         emit deviceStatus(QStringLiteral("Liq. %1\u00b0%2  Pump %3 RPM  Fan %4 RPM")
@@ -263,10 +228,6 @@ void KrakenWorker::sensorTick()
     }
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// WASAPI loopback (déplacé depuis KrakenLCDWidget — capture sur le thread de rendu).
-// COM est déjà initialisé (MTA) par start() ; on ne refait PAS CoInitializeEx ici.
-// ═════════════════════════════════════════════════════════════════════════════
 #ifdef _WIN32
 
 void KrakenWorker::initWasapi()
@@ -337,9 +298,6 @@ QVector<float> KrakenWorker::readWasapiBands()
 
     if (m_wasapiAcc.size() < N) m_wasapiAcc.fill(0.f, N);
 
-    // Detection de format robuste : EXTENSIBLE -> SubFormat, sinon wFormatTag.
-    // Format non float et non PCM 16 bits -> ignore (silence) plutot que
-    // d'interpreter les octets n'importe comment (garbage a l'ecran).
     bool isFloat = (fmt->wFormatTag == WAVE_FORMAT_IEEE_FLOAT);
     bool isS16   = (fmt->wFormatTag == WAVE_FORMAT_PCM && fmt->wBitsPerSample == 16);
     if (fmt->wFormatTag == WAVE_FORMAT_EXTENSIBLE) {
@@ -352,10 +310,6 @@ QVector<float> KrakenWorker::readWasapiBands()
     UINT32 packetSize = 0;
     HRESULT hr = capture->GetNextPacketSize(&packetSize);
     if (FAILED(hr)) {
-        // Peripherique par defaut change/invalide (AUDCLNT_E_DEVICE_INVALIDATED) :
-        // on ferme ; renderTick re-initialisera (throttle ~2 s) sur le nouveau
-        // device par defaut. Pas d'initWasapi() ici : pendant la transition
-        // il echouerait, et le visualiseur resterait mort.
         qWarning() << "[KrakenLCD/Audio] capture lost (" << Qt::hex << (quint32)hr
                    << ") — will reinitialize WASAPI on default device";
         closeWasapi();

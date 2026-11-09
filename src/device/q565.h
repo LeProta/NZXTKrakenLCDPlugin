@@ -6,20 +6,11 @@
 #include <QImage>
 #include <QByteArray>
 
-// =============================================================================
-//  Encodeur Q565 (flux LCD du Kraken Elite V2).
-//  Encodeur SEUL : le décodage est fait par le firmware du device. L'ancien
-//  décodeur de diagnostic (generateStatementListModel & co) a été supprimé
-//  (code mort). Fonctions `inline` : ce header est inclus par plusieurs TU.
-// =============================================================================
 namespace Q565_Encoder {
     constexpr unsigned short MAX_COLORS = 64;
-    // Anti-artefacts : désactive les opcodes 2 octets (LUMA / INDEX_DIFF), suspectés
-    // de désynchroniser le décodeur du firmware sur certaines frames (corruption qui
-    // se propage → bandes / bloc en bas). RUN, INDEX et DIFF (1 octet) restent actifs.
     constexpr bool Q565_USE_COMPLEX_OPS = false;
-    constexpr unsigned short Q565_OP_RGB565     = 0xFE;       // littéral 16 bits
-    constexpr unsigned short Q565_OP_INDEX      = 0b00000000; // index table (implicite : hash brut)
+    constexpr unsigned short Q565_OP_RGB565     = 0xFE;
+    constexpr unsigned short Q565_OP_INDEX      = 0b00000000;
     constexpr unsigned short Q565_OP_INDEX_DIFF = 0b10100000;
     constexpr unsigned short Q565_OP_DIFF       = 0b01000000;
     constexpr unsigned short Q565_OP_LUMA       = 0b10000000;
@@ -41,10 +32,6 @@ namespace Q565_Encoder {
         return (a+b) & 0b111111; // % 64
     }
 
-    // Table de couleurs a acces direct (le hash EST l'index, 0..63).
-    // Remplace l'ancien QMap<quint8,quint16> : contains/value/insert par PIXEL
-    // (409 600 pixels/frame a 60 fps) passaient par un arbre rouge-noir avec
-    // allocations — le point chaud de tout l'encodeur.
     struct ColorTable {
         quint16 color[MAX_COLORS] = {};
         bool    used [MAX_COLORS] = {};
@@ -53,7 +40,7 @@ namespace Q565_Encoder {
     inline bool wouldEncodeColorTable(quint16 pixel, const ColorTable& colorTable, quint8& colorHash) {
         colorHash = pixelHash(pixel);
         if(!colorTable.used[colorHash]) {
-            return true;   // slot libre -> insertion toujours possible (64 slots max)
+            return true;
         }
         return colorTable.color[colorHash] != pixel;
     }
@@ -61,14 +48,14 @@ namespace Q565_Encoder {
     inline quint8 encodeColorTable(quint16 pixel, ColorTable& colorTable) {
         quint8 colorHash = pixelHash(pixel);
         colorTable.used [colorHash] = true;
-        colorTable.color[colorHash] = pixel;   // insertion ou remplacement (collision)
+        colorTable.color[colorHash] = pixel;
         return colorHash;
     }
 
     inline void encodeFullPixel(QByteArray* encodeArray, quint16 currentPixel) {
-        encodeArray->append(char(Q565_OP_RGB565));            // RGB565 (full pixel marker)
-        encodeArray->append(char(currentPixel & 0xFF));       // 565 low byte
-        encodeArray->append(char((currentPixel >> 8) & 0xFF)); // 565 high byte
+        encodeArray->append(char(Q565_OP_RGB565));
+        encodeArray->append(char(currentPixel & 0xFF));
+        encodeArray->append(char((currentPixel >> 8) & 0xFF));
     }
 
     inline qint8 calculateDiff(quint8 newValue, quint8 previousValue, quint8 max)
@@ -155,14 +142,14 @@ namespace Q565_Encoder {
         quint8 colorHash;
         bool wouldAdd = wouldEncodeColorTable(current, colorTable, colorHash);
         if(!wouldAdd && colorHash < MAX_COLORS) {
-            encodeArray->append(char(colorHash)); // 565_OP_INDEX
+            encodeArray->append(char(colorHash));
             return;
         }
         if(Q565_USE_COMPLEX_OPS && encodeLuma(encodeArray, previous, r, g, b)) {
 
         } else if(Q565_USE_COMPLEX_OPS && encodeIndexDiffed(encodeArray, r, g, b, colorTable)) {
             encodeColorTable(current, colorTable);
-        } else{ // littéral RGB565 (op simple et robuste)
+        } else{
             encodeFullPixel(encodeArray, current);
         }
         if(wouldAdd) {
@@ -171,8 +158,6 @@ namespace Q565_Encoder {
     }
 
     inline QByteArray encode(const QImage& image, QByteArray* encodeArray = nullptr) {
-        // Buffer local si l'appelant n'en fournit pas (pas de fuite) ; sinon
-        // réutilisation du buffer préalloué (resize(0) garde la capacité).
         QByteArray localBuffer;
         if(encodeArray == nullptr) {
             localBuffer.reserve(QRGB_ARRAY_SIZE);
@@ -193,13 +178,8 @@ namespace Q565_Encoder {
         quint8 r_new, g_new, b_new;
         quint16 currentPixel = 0;
         ColorTable colorTable;
-        // Préchargement IDENTIQUE à celui du décodeur du firmware — ne pas
-        // "corriger" : pixelHash(0xFFFF) vaut 62, pas 63, donc l'entrée 63
-        // n'est jamais retrouvée par hachage (le premier pixel blanc émet un
-        // littéral et s'installe en 62). C'est un no-op volontairement
-        // conservé : encodeur et décodeur doivent partir de la même table.
-        colorTable.used[0]  = true; colorTable.color[0]  = 0x0000;   // noir
-        colorTable.used[63] = true; colorTable.color[63] = 0xFFFF;   // blanc
+        colorTable.used[0]  = true; colorTable.color[0]  = 0x0000;
+        colorTable.used[63] = true; colorTable.color[63] = 0xFFFF;
         unsigned char run{0};
         QRgb rgb{0};
         QRgb previousRgb{0};
@@ -210,7 +190,7 @@ namespace Q565_Encoder {
                 rgb = line[x];
 
                 if((previousRgb == rgb) && ( y > 0 || x > 0) ) {
-                    if( run > 61) { // 62 répétitions en attente : flush (max opcode = 61 → 62 pixels)
+                    if( run > 61) {
                         run -= 1;
                         encodeArray->append(char(Q565_OP_RUN | run));
                         run = 1;
@@ -220,8 +200,8 @@ namespace Q565_Encoder {
                     }
                 } else {
                     currentPixel = get565Pixel2(rgb);
-                    if(run >= 1) { // run en cours : flush
-                        run -= 1; // le décodeur ajoute +1 (offset -1 à l'envoi)
+                    if(run >= 1) {
+                        run -= 1;
                         encodeArray->append(char(Q565_OP_RUN | run));
                         run = 0;
                     }
@@ -237,9 +217,6 @@ namespace Q565_Encoder {
                 previousRgb = rgb;
             }
         }
-        // Flush du run final. `>= 1` (et pas `> 1`) : run == 1 correspond à UN
-        // pixel répété en attente ; l'ancien `> 1` le perdait → le décodeur du
-        // firmware recevait width*height-1 pixels (décalage en fin de frame).
         if(run >= 1) {
             --run;
             encodeArray->append(char(Q565_OP_RUN | run));

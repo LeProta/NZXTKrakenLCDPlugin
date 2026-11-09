@@ -26,7 +26,6 @@
 
 namespace NZXTKraken {
 
-// ── Constantes ──────────────────────────────────────────────────────────────
 static const QString IMAGE_FILTER =
     QStringLiteral("Images (*.gif *.png *.jpg *.jpeg)");
 
@@ -36,10 +35,6 @@ static const QStringList ALLOWED_EXTENSIONS = {
 
 static constexpr qint64 MAX_FILE_SIZE = 32LL * 1024 * 1024;   // 32 MiB
 
-// Upload/Browse/Remove : boutons natifs (thème OpenRGB), même gabarit que
-// Reset/Apply du plugin Pump — plus de stylesheet dédiée.
-
-// Libelles "muets" (statut + aide media) : couleur derivee du theme clair/sombre.
 static QString statusLabelStyle(bool dark)
 {
     return QString("color:%1;font-size:11px;font-family:monospace;")
@@ -68,9 +63,6 @@ void LCDPreviewWidget::paintEvent(QPaintEvent*)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
 
-    // Couleurs derivees de la palette de l'application (OpenRGB sombre/clair) :
-    // contour et fond "ecran eteint" suivent le theme automatiquement, Qt
-    // repeignant le widget a chaque changement de palette.
     const QColor ring   = palette().color(QPalette::Mid);
     const QColor offScr = palette().color(QPalette::Base);
     QColor       hint   = palette().color(QPalette::WindowText);
@@ -83,8 +75,6 @@ void LCDPreviewWidget::paintEvent(QPaintEvent*)
     p.setClipPath(clip);
     if (!m_frame.isNull()) {
         p.drawImage(6, 6, m_frame);
-        // L'aperçu reste à pleine luminosité : le curseur ne pilote que l'écran
-        // physique, pas le rendu à l'écran.
     }
     else {
         p.fillRect(6,6,208,208,offScr);
@@ -94,28 +84,16 @@ void LCDPreviewWidget::paintEvent(QPaintEvent*)
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// WASAPI loopback
-// ─────────────────────────────────────────────────────────────────────────────
-// WASAPI : init/close/readBands deplaces dans KrakenWorker.
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers UI (KrakenColorPicker custom popovers)
-// ─────────────────────────────────────────────────────────────────────────────
 ColorSwatchButton* KrakenLCDWidget::makeColorButton(QColor c)
 {
     auto* btn = new ColorSwatchButton;
     btn->setSolid(c);
-    btn->setFixedSize(36, 24);  // même taille pour tous les boutons couleur du panel
+    btn->setFixedSize(36, 24);
     return btn;
 }
 
 void KrakenLCDWidget::connectColorButton(ColorSwatchButton* btn, QColor& target)
 {
-    // QPointer : pick() fait tourner une boucle d'événements imbriquée — si le
-    // plugin est déchargé pendant que le popover est ouvert, le widget (et
-    // `target`, qui pointe dans m_config) est détruit. Sans le garde-fou,
-    // `target = c` écrirait dans de la mémoire libérée.
     QPointer<KrakenLCDWidget> self(this);
     connect(btn, &QPushButton::clicked, [=,&target](){
         QColor c = target;
@@ -132,7 +110,7 @@ ColorSwatchButton* KrakenLCDWidget::makeTextColorButton(QColor fill, QColor outl
 {
     auto* btn = new ColorSwatchButton;
     btn->setFillOutline(fill, outline);
-    btn->setFixedSize(36, 24);  // même taille que makeColorButton
+    btn->setFixedSize(36, 24);
     return btn;
 }
 
@@ -155,7 +133,7 @@ ColorSwatchButton* KrakenLCDWidget::makeGradientButton(const GradientStops& stop
 {
     auto* btn = new ColorSwatchButton;
     btn->setGradient(stops.isEmpty() ? defaultVizStops() : stops);
-    btn->setFixedSize(36, 24);  // même taille que makeColorButton (uniformité panel)
+    btn->setFixedSize(36, 24);
     return btn;
 }
 
@@ -187,7 +165,6 @@ QComboBox* KrakenLCDWidget::makeSensorCombo(bool includeLiquid)
     return cb;
 }
 
-// Chemin du média de fond du mode courant (ou nullptr si le mode n'en a pas).
 QString* KrakenLCDWidget::activeGifPath()
 {
     switch (m_config.mode) {
@@ -199,8 +176,6 @@ QString* KrakenLCDWidget::activeGifPath()
     }
 }
 
-// Affiche le conteneur média (Upload/Browse) pour Image/GIF, ou pour un mode
-// infographic dont le fond GIF est activé.
 void KrakenLCDWidget::updateMediaVisibility()
 {
     if (!m_mediaContainer) return;
@@ -216,9 +191,6 @@ void KrakenLCDWidget::updateMediaVisibility()
     m_mediaContainer->setVisible(show);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Upload / Browse / Validation / Fade erreur
-// ─────────────────────────────────────────────────────────────────────────────
 void KrakenLCDWidget::flashErrorBorder(QPushButton* btn)
 {
     if (!btn) return;
@@ -228,10 +200,8 @@ void KrakenLCDWidget::flashErrorBorder(QPushButton* btn)
     const QString border  = m_darkTheme ? "#2A2A2E" : "#D0D0D4";
     const QString fg      = m_darkTheme ? "#FFFFFF" : "#1A1A1E";
 
-    // QPointer : le bouton peut mourir pendant l'animation (unload du plugin).
     QPointer<QPushButton> safeBtn(btn);
 
-    // On ne touche QUE le fond du bouton ; la bordure reste celle du thème.
     auto applyBg = [safeBtn, border, fg](const QColor& c) {
         if (!safeBtn) return;
         safeBtn->setStyleSheet(
@@ -240,12 +210,8 @@ void KrakenLCDWidget::flashErrorBorder(QPushButton* btn)
             .arg(c.name(), fg, border));
     };
 
-    // Immédiatement → fond rouge
     applyBg(errBg);
 
-    // Après 1 s → fondu du fond rouge vers le fond normal (~500 ms, 10 × 50 ms).
-    // Compteur capturé PAR VALEUR (lambda mutable) : rien à libérer si le
-    // widget meurt en cours de fondu.
     QTimer::singleShot(1000, this, [this, safeBtn, errBg, normalBg, applyBg]() {
         if (!safeBtn) return;
 
@@ -265,7 +231,7 @@ void KrakenLCDWidget::flashErrorBorder(QPushButton* btn)
             if (step >= 10) {
                 fade->stop();
                 fade->deleteLater();
-                safeBtn->setStyleSheet(QString());   // retour au style natif
+                safeBtn->setStyleSheet(QString());
             }
         });
         fade->start();
@@ -339,7 +305,6 @@ void KrakenLCDWidget::doBrowse()
         path = sel.first();
     }
 
-    // Depuis media/ → pas de re-copie, juste validation
     QFileInfo fi(path);
     QString ext = fi.suffix().toLower();
     if (!ALLOWED_EXTENSIONS.contains(ext) || fi.size() > MAX_FILE_SIZE) {
@@ -352,8 +317,6 @@ void KrakenLCDWidget::doBrowse()
 
 void KrakenLCDWidget::doRemove()
 {
-    // Retire l'affichage du media du mode courant : on vide juste le chemin,
-    // le fichier reste dans le dossier media/. Le worker re-rend sans media.
     if (QString* tgt = activeGifPath()) {
         if (tgt->isEmpty()) return;
         tgt->clear();
@@ -361,40 +324,24 @@ void KrakenLCDWidget::doRemove()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Persistence — ne sauvegarde rien tant que le constructeur n'est pas fini
-// ─────────────────────────────────────────────────────────────────────────────
 void KrakenLCDWidget::saveConfig()
 {
     if (!m_ready) return;
-    if (m_worker) m_worker->setConfig(m_config);   // pousse la config vers le thread de rendu
-    // Écriture disque debouncée (500 ms) : un drag de slider déclenche des
-    // dizaines de valueChanged/s — on n'écrit qu'une fois le geste terminé.
-    // Flush garanti dans le destructeur.
+    if (m_worker) m_worker->setConfig(m_config);
     if (m_saveTimer) m_saveTimer->start();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constructeur / destructeur
-// ─────────────────────────────────────────────────────────────────────────────
 KrakenLCDWidget::KrakenLCDWidget(QWidget* parent) : QWidget(parent)
 {
-    // m_ready = false par défaut → saveConfig() et onModeChanged() sont no-op
 
-    // Charger la config sauvegardée
     m_config = KrakenUiPersistence::load();
-    DisplayMode savedMode = m_config.mode;   // sauvegarder avant que buildUI l'écrase
+    DisplayMode savedMode = m_config.mode;
     int savedBrightness   = m_config.brightness;
 
-    // Thème (clair/sombre) hérité d'OpenRGB via la palette de l'application,
-    // détecté AVANT buildUI pour que les boutons Upload/Browse soient stylisés
-    // correctement dès leur création.
     m_darkTheme = palette().color(QPalette::Window).lightness() < 128;
 
     buildUI();
-    // Ouverture device + demarrage capteurs : desormais sur le thread du worker.
 
-    // Restaurer le mode dans le combo (sans déclencher onModeChanged prématurément)
     m_modeCombo->blockSignals(true);
     for (int i = 0; i < m_modeCombo->count(); i++) {
         if (m_modeCombo->itemData(i).toInt() == int(savedMode)) {
@@ -404,31 +351,23 @@ KrakenLCDWidget::KrakenLCDWidget(QWidget* parent) : QWidget(parent)
     }
     m_modeCombo->blockSignals(false);
 
-    // Restaurer la luminosité (sans déclencher le slot)
     m_brightnessSlider->blockSignals(true);
     m_brightnessSlider->setValue(savedBrightness);
     m_brightnessSlider->blockSignals(false);
 
-    // Restaurer le mode sauvegardé dans la config (buildUI aurait pu l'écraser)
     m_config.mode       = savedMode;
     m_config.brightness = savedBrightness;
 
-    // Debounce de la persistance (créé avant m_ready pour être dispo dès le 1er saveConfig)
     m_saveTimer = new QTimer(this);
     m_saveTimer->setSingleShot(true);
-    m_saveTimer->setInterval(250);   // fenêtre de perte réduite en cas de kill/crash
+    m_saveTimer->setInterval(250);
     connect(m_saveTimer, &QTimer::timeout, this,
             [this]{ KrakenUiPersistence::save(m_config); });
 
-    // ── Tout est prêt — activer ──────────────────────────────────────────
     m_ready = true;
 
-    // Premier appel réel de onModeChanged (met à jour panels, media container, timers)
     onModeChanged(m_modeCombo->currentIndex());
 
-    // Démarrer les timers (le render timer reprend l'intervalle calculé par
-    // onModeChanged ci-dessus, c.-à-d. la cadence de l'écran du modèle détecté).
-    // --- Worker de rendu sur thread dedie ---
     m_thread = new QThread(this);
     m_worker = new KrakenWorker(&m_device, &m_sensors);
     m_worker->moveToThread(m_thread);
@@ -448,7 +387,6 @@ KrakenLCDWidget::KrakenLCDWidget(QWidget* parent) : QWidget(parent)
 
     m_thread->start();
 
-    // Vérification de mise à jour (GitHub releases/latest), asynchrone.
     m_updater = new UpdateChecker(this);
     connect(m_updater, &UpdateChecker::updateAvailable, this,
             [this](const QString& tag, const QString& url) {
@@ -463,12 +401,8 @@ KrakenLCDWidget::KrakenLCDWidget(QWidget* parent) : QWidget(parent)
 
 KrakenLCDWidget::~KrakenLCDWidget()
 {
-    // Flush direct (pas via le debounce : le timer meurt avec le widget)
     if (m_saveTimer) m_saveTimer->stop();
     if (m_ready) KrakenUiPersistence::save(m_config);
-    // Interrompt les attentes en cours de sendFrame (acks 2×5 s, bulk 3×5 s)
-    // AVANT l'appel bloquant : sans ça, un device décroché gelait l'UI
-    // d'OpenRGB jusqu'à ~15-20 s au unload du plugin.
     m_device.requestAbort();
     if (m_worker)
         QMetaObject::invokeMethod(m_worker, "stop", Qt::BlockingQueuedConnection);
@@ -478,9 +412,6 @@ KrakenLCDWidget::~KrakenLCDWidget()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Media container (Upload + Browse + helper)
-// ─────────────────────────────────────────────────────────────────────────────
 void KrakenLCDWidget::buildMediaContainer()
 {
     m_mediaContainer = new QWidget;
@@ -511,13 +442,9 @@ void KrakenLCDWidget::buildMediaContainer()
     m_lblMediaHelper->setWordWrap(true);
     lay->addWidget(m_lblMediaHelper);
 
-    // Masqué par défaut
     m_mediaContainer->setVisible(false);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Construction de l'interface
-// ─────────────────────────────────────────────────────────────────────────────
 void KrakenLCDWidget::buildUI()
 {
     auto* root = new QHBoxLayout(this);
@@ -534,7 +461,6 @@ void KrakenLCDWidget::buildUI()
     leftCol->addWidget(m_lblDeviceName);
     leftCol->addWidget(m_lblStatus);
 
-    // Bannière de mise à jour (masquée tant qu'aucune version plus récente).
     m_updateBanner = new QLabel;
     m_updateBanner->setTextFormat(Qt::RichText);
     m_updateBanner->setOpenExternalLinks(true);
@@ -543,18 +469,14 @@ void KrakenLCDWidget::buildUI()
     m_updateBanner->hide();
     leftCol->addWidget(m_updateBanner);
 
-    // Sélecteur de mode — signaux bloqués pendant l'ajout des items
     buildModeSelector();
     leftCol->addWidget(m_modeCombo);
 
-    // Luminosité
     auto* bRow = new QHBoxLayout;
     bRow->addWidget(new QLabel("☀"));
     m_brightnessSlider = new QSlider(Qt::Horizontal);
     m_brightnessSlider->setRange(0,100);
     m_brightnessSlider->setValue(100);
-    // Envoi HID debouncé : un drag génère des dizaines de valueChanged/s, et
-    // chaque commande est sérialisée avec les frames sur le thread du worker.
     auto* brightnessSend = new QTimer(this);
     brightnessSend->setSingleShot(true);
     brightnessSend->setInterval(150);
@@ -566,17 +488,15 @@ void KrakenLCDWidget::buildUI()
     connect(m_brightnessSlider, &QSlider::valueChanged, [this, brightnessSend](int v){
         m_config.brightness = v;
         saveConfig();
-        brightnessSend->start();   // n'affecte que l'écran physique, pas l'aperçu
+        brightnessSend->start();
     });
     bRow->addWidget(m_brightnessSlider);
     bRow->addWidget(new QLabel("☀"));
     leftCol->addLayout(bRow);
 
-    // Media container (conditionnel)
     buildMediaContainer();
     leftCol->addWidget(m_mediaContainer);
 
-    // Stack des panels
     m_stack = new QStackedWidget;
     buildModePanel_ImageGIF();
     buildModePanel_SingleInfographic();
@@ -595,7 +515,6 @@ void KrakenLCDWidget::buildUI()
     leftCol->addWidget(m_stack);
     leftCol->addStretch();
 
-    // Colonne droite : preview + rotate
     auto* rightCol = new QVBoxLayout;
     rightCol->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
     rightCol->setSpacing(8);
@@ -614,8 +533,6 @@ void KrakenLCDWidget::buildModeSelector()
 {
     m_modeCombo = new QComboBox;
 
-    // ── Bloquer les signaux pendant l'ajout pour éviter des appels à
-    //    onModeChanged() alors que les widgets n'existent pas encore ─────────
     m_modeCombo->blockSignals(true);
 
     m_modeCombo->addItem("Image/GIF",                   int(DisplayMode::IMAGE_GIF));
@@ -628,12 +545,10 @@ void KrakenLCDWidget::buildModeSelector()
 
     m_modeCombo->blockSignals(false);
 
-    // Connecter APRÈS le remplissage
     connect(m_modeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &KrakenLCDWidget::onModeChanged);
 }
 
-// ─── Macro capteur : metric + Number (fill+outline) + Text (fill+outline) ───
 #define SENSOR_BLOCK(TITLE, RC) \
     if (*(TITLE) != '\0') l->addWidget(new QLabel(TITLE)); \
     { auto* cb = makeSensorCombo(); \
@@ -685,23 +600,20 @@ void KrakenLCDWidget::buildModePanel_DualInfographic()
 {
     m_panelDual = new QWidget; auto* l = new QVBoxLayout(m_panelDual); l->setSpacing(8);
     
-    // ── Display Mode ──
     auto mRow = new QHBoxLayout; mRow->addWidget(new QLabel("Display Mode"));
     auto* dc = new QComboBox; dc->addItem("Vertical"); dc->addItem("Horizontal");
     if (!m_config.dualVertical) dc->setCurrentIndex(1);
     mRow->addWidget(dc); mRow->addStretch(); l->addLayout(mRow);
 
-    // ── Background (Toujours visible et parfaitement aligné) ──
     auto* bgRow = new QHBoxLayout; bgRow->addWidget(new QLabel("Background"));
     auto* bBg = makeColorButton(m_config.dual.bgColor);
     connectColorButton(bBg,m_config.dual.bgColor);
     bgRow->addWidget(bBg); bgRow->addStretch();
     l->addLayout(bgRow);
 
-    // ── Logo (Masqué en Horizontal, parfaitement aligné en Vertical) ──
     auto* lgWrap = new QWidget;
     auto* lgRow = new QHBoxLayout(lgWrap);
-    lgRow->setContentsMargins(0, 0, 0, 0); // Élimine les marges invisibles du QWidget pour éviter le décalage !
+    lgRow->setContentsMargins(0, 0, 0, 0);
     
     auto* ck = new QCheckBox("Logo"); ck->setChecked(m_config.dual.showLogo);
     connect(ck, &QCheckBox::toggled, [this](bool b){ m_config.dual.showLogo = b; saveConfig(); });
@@ -712,19 +624,17 @@ void KrakenLCDWidget::buildModePanel_DualInfographic()
     
     l->addWidget(lgWrap);
 
-    // Gestion de la visibilité dynamique du Logo selon le mode (Vertical / Horizontal)
     auto updateLogoVis = [lgWrap, this]() {
         lgWrap->setVisible(m_config.dualVertical);
     };
-    updateLogoVis(); // Appel initial au chargement
+    updateLogoVis();
 
     connect(dc, QOverload<int>::of(&QComboBox::currentIndexChanged), [this, lgWrap](int i){
         m_config.dualVertical = (i == 0);
         saveConfig();
-        lgWrap->setVisible(m_config.dualVertical); // Masque ou affiche instantanément le widget
+        lgWrap->setVisible(m_config.dualVertical);
     });
 
-    // ── Reading 1 ──
     l->addWidget(new QLabel("Reading 1"));
     SENSOR_BLOCK("", m_config.dualReading1);
     { auto vr=new QHBoxLayout; vr->addWidget(new QLabel("Visualization"));
@@ -732,7 +642,6 @@ void KrakenLCDWidget::buildModePanel_DualInfographic()
       connectColorButton(b,m_config.dualReading1.colorViz);
       vr->addWidget(b); vr->addStretch(); l->addLayout(vr); }
 
-    // ── Reading 2 ──
     l->addWidget(new QLabel("Reading 2"));
     SENSOR_BLOCK("", m_config.dualReading2);
     { auto vr=new QHBoxLayout; vr->addWidget(new QLabel("Visualization"));
@@ -772,7 +681,6 @@ void KrakenLCDWidget::buildModePanel_Clockface()
 {
     m_panelClock = new QWidget; auto* l = new QVBoxLayout(m_panelClock); l->setSpacing(8);
 
-    // Helpers locaux : ajoutent une ligne "label + bouton" à la page donnée.
     auto colorRow = [&](QVBoxLayout* lay, const QString& lbl, QColor& col){
         auto* row = new QHBoxLayout; row->addWidget(new QLabel(lbl));
         auto* b = makeColorButton(col); connectColorButton(b, col);
@@ -781,7 +689,7 @@ void KrakenLCDWidget::buildModePanel_Clockface()
     auto gradientRow = [&](QVBoxLayout* lay, const QString& lbl, GradientStops& stops){
         auto* row = new QHBoxLayout; row->addWidget(new QLabel(lbl));
         auto* b = makeGradientButton(stops);
-        connectGradientButton(b, stops, CLOCK_GRADIENT_PRESETS);   // presets propres à l'horloge
+        connectGradientButton(b, stops, CLOCK_GRADIENT_PRESETS);
         row->addWidget(b); row->addStretch(); lay->addLayout(row);
     };
     auto formatRow = [&](QVBoxLayout* lay, bool& is24){
@@ -794,15 +702,11 @@ void KrakenLCDWidget::buildModePanel_Clockface()
         lay->addWidget(cb);
     };
 
-    // ── Clockface (menu déroulant, façon "Display Mode" du dual) ──
     auto mRow = new QHBoxLayout; mRow->addWidget(new QLabel("Clockface"));
     auto* faceCombo = new QComboBox;
     faceCombo->addItem("Analog"); faceCombo->addItem("Gradient"); faceCombo->addItem("Digital");
     mRow->addWidget(faceCombo); mRow->addStretch(); l->addLayout(mRow);
 
-    // Un conteneur de réglages par clockface, affiché/masqué selon la sélection
-    // (comme le logo du dual) : un conteneur masqué ne prend aucune place, donc
-    // plus d'espace vide entre les éléments quelle que soit la clockface.
     auto* pageAnalog = new QWidget;  auto* plA = new QVBoxLayout(pageAnalog);
     plA->setContentsMargins(0,0,0,0); plA->setSpacing(8);
     colorRow(plA, "Background", m_config.bgColor);
@@ -840,7 +744,6 @@ void KrakenLCDWidget::buildModePanel_Clockface()
         saveConfig();
     });
 
-    // État initial : sélection + conteneur correspondant au style sauvegardé.
     const int st = std::clamp(m_config.clockStyle, 0, 2);
     faceCombo->blockSignals(true); faceCombo->setCurrentIndex(st); faceCombo->blockSignals(false);
     showFace(st);
@@ -861,14 +764,12 @@ void KrakenLCDWidget::buildModePanel_AudioVisual()
     invRow->addWidget(inv); invRow->addStretch(); l->addLayout(invRow);
     auto* vzRow = new QHBoxLayout; vzRow->addWidget(new QLabel("Visualization"));
     auto* bVz = makeGradientButton(m_config.audioStops);
-    connectGradientButton(bVz, m_config.audioStops);   // mêmes presets que single/triple
+    connectGradientButton(bVz, m_config.audioStops);
     vzRow->addWidget(bVz); vzRow->addStretch(); l->addLayout(vzRow);
     auto* cnRow = new QHBoxLayout;
     auto* cn = new QCheckBox("Connected"); cn->setChecked(m_config.audioConnected);
     connect(cn,&QCheckBox::toggled,[this](bool b){m_config.audioConnected=b; saveConfig();});
     cnRow->addWidget(cn); cnRow->addStretch(); l->addLayout(cnRow);
-    // ── Sensibilité exprimée en dB (plancher de bruit) ──
-    // Low = -30 dB (à gauche) … High = -120 dB (à droite), par pas de 10 dB.
     auto* sensHdr = new QHBoxLayout;
     sensHdr->addWidget(new QLabel("Sensitivity"));
     sensHdr->addStretch();
@@ -882,17 +783,16 @@ void KrakenLCDWidget::buildModePanel_AudioVisual()
     sens->setPageStep(10);
     sens->setTickInterval(10);
     sens->setTickPosition(QSlider::TicksBelow);
-    sens->setInvertedAppearance(true);         // -30 (Low) à gauche, -120 (High) à droite
-    // audioSensitivity 0..1 → dB : -30 - s*90  (donc -30 dB = Low, -120 dB = High)
+    sens->setInvertedAppearance(true);
     sens->setValue(int(std::lround(-30.0 - std::clamp(m_config.audioSensitivity, 0.f, 1.f) * 90.0)));
     auto syncSensLabel = [sensVal](int db){ sensVal->setText(QString("%1 dB").arg(db)); };
     syncSensLabel(sens->value());
     connect(sens,&QSlider::valueChanged,[this,sens,syncSensLabel](int v){
-        int snapped = int(std::lround(v / 10.0) * 10);   // verrouille sur des pas de 10 dB
+        int snapped = int(std::lround(v / 10.0) * 10);
         snapped = std::clamp(snapped, -120, -30);
         if (snapped != v) { sens->blockSignals(true); sens->setValue(snapped); sens->blockSignals(false); }
         syncSensLabel(snapped);
-        m_config.audioSensitivity = float((-30 - snapped) / 90.0);   // -30->0 (Low), -120->1 (High)
+        m_config.audioSensitivity = float((-30 - snapped) / 90.0);
         saveConfig();
     });
     l->addWidget(sens);
@@ -916,9 +816,6 @@ void KrakenLCDWidget::buildModePanel_NowPlaying()
 
     auto* bgRow = new QHBoxLayout;
     bgRow->addWidget(new QLabel("Background"));
-    // npBgColor : fond propre à Now Playing (avant : partagé avec le
-    // Clockface Analog via m_config.bgColor → les deux boutons se pilotaient
-    // mutuellement sans rafraîchir leurs swatches).
     auto* bBg = makeColorButton(m_config.npBgColor);
     connectColorButton(bBg, m_config.npBgColor);
     bgRow->addWidget(bBg); bgRow->addStretch();
@@ -941,21 +838,16 @@ void KrakenLCDWidget::buildModePanel_NowPlaying()
     l->addStretch();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Slots
-// ─────────────────────────────────────────────────────────────────────────────
-void KrakenLCDWidget::onModeChanged(int /*index*/)
+void KrakenLCDWidget::onModeChanged(int )
 {
-    if (!m_ready) return;   // pas encore initialisé
+    if (!m_ready) return;
 
     DisplayMode mode = static_cast<DisplayMode>(m_modeCombo->currentData().toInt());
     m_config.mode = mode;
     saveConfig();
 
-    // Show/hide du conteneur media (selon le mode + le toggle GIF par mode)
     updateMediaVisibility();
 
-    // Panel correspondant
     if (m_stack) {
         const QMap<DisplayMode, QWidget*> panelMap = {
             { DisplayMode::IMAGE_GIF,              m_panelImageGIF },
@@ -970,16 +862,10 @@ void KrakenLCDWidget::onModeChanged(int /*index*/)
             m_stack->setCurrentWidget(p);
     }
 
-    // Cadence de rendu + WASAPI : geres par le worker (applyCadence),
-    // declenche par le setConfig() ci-dessus quand le mode change.
 }
-
-// onRenderTick / onSensorTick : deplaces dans KrakenWorker (thread de rendu).
 
 void KrakenLCDWidget::onRotateClicked()
 {
-    // Rotation purement logicielle : saveConfig() pousse cfg.rotation au
-    // worker, le renderer applique la rotation au dessin de chaque frame.
     m_config.rotation = (m_config.rotation + 90) % 360;
     saveConfig();
 }
@@ -989,22 +875,18 @@ void KrakenLCDWidget::setDarkTheme(bool dark)
     m_darkTheme = dark;
     if (m_lblStatus)      m_lblStatus->setStyleSheet(statusLabelStyle(dark));
     if (m_lblMediaHelper) m_lblMediaHelper->setStyleSheet(helperLabelStyle(dark));
-    if (m_preview)        m_preview->update();   // repeint l'apercu avec la nouvelle palette
+    if (m_preview)        m_preview->update();
 }
 
 void KrakenLCDWidget::changeEvent(QEvent* e)
 {
     QWidget::changeEvent(e);
-    // OpenRGB applique sa palette (sombre/claire) à toute l'application ; on suit
-    // ses changements de thème à chaud pour restyler les boutons Upload/Browse.
     if (e && (e->type() == QEvent::PaletteChange ||
               e->type() == QEvent::ApplicationPaletteChange)) {
         const bool dark = palette().color(QPalette::Window).lightness() < 128;
         if (dark != m_darkTheme)
             setDarkTheme(dark);
     }
-    // OpenRGB change la langue à chaud (installTranslator -> LanguageChange) ;
-    // on resuit l'unité de température (°C/°F) selon la locale OpenRGB.
     if (e && e->type() == QEvent::LanguageChange) {
         FrameRenderer::setFahrenheit(OpenRGBSettings::prefersFahrenheit());
     }

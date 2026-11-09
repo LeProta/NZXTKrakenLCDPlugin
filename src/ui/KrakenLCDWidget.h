@@ -14,13 +14,12 @@
 #include "../sensors/SystemSensors.h"
 #include "KrakenColorPicker.h"
 
-class QThread;   // fwd (membre pointeur)
+class QThread;
 
 namespace NZXTKraken {
 
-class KrakenWorker;   // defini dans KrakenWorker.h
+class KrakenWorker;
 
-// ── Aperçu circulaire 220×220 ─────────────────────────────────────────────────
 class LCDPreviewWidget : public QWidget {
     Q_OBJECT
 public:
@@ -32,7 +31,6 @@ private:
     QImage m_frame;
 };
 
-// ── Widget principal ──────────────────────────────────────────────────────────
 class KrakenLCDWidget : public QWidget {
     Q_OBJECT
 public:
@@ -41,7 +39,7 @@ public:
     void setDarkTheme(bool dark);
 
 protected:
-    void changeEvent(QEvent* e) override;   // suit le thème clair/sombre d'OpenRGB
+    void changeEvent(QEvent* e) override;
 
 private slots:
     void onModeChanged(int index);
@@ -59,16 +57,14 @@ private:
     void buildModePanel_AudioVisual();
     void buildModePanel_NowPlaying();
 
-    // ── Upload / Browse ─────────────────────────────────────────────────────
     void doUpload();
     void doBrowse();
-    void doRemove();   // retire l'affichage du media du mode courant (ne supprime PAS le fichier)
+    void doRemove();
     bool validateAndImport(const QString& path, QPushButton* triggerBtn);
     void flashErrorBorder(QPushButton* btn);
 
-    // ── Helpers ─────────────────────────────────────────────────────────────
-    void               updateMediaVisibility();   // affiche le conteneur média selon le mode + useGif
-    QString*           activeGifPath();            // chemin GIF du mode courant (ou nullptr)
+    void               updateMediaVisibility();
+    QString*           activeGifPath();
     ColorSwatchButton* makeColorButton(QColor initial);
     void               connectColorButton(ColorSwatchButton* btn, QColor& target);
     ColorSwatchButton* makeTextColorButton(QColor fill, QColor outline);
@@ -80,20 +76,16 @@ private:
                                              const QList<GradientStops>& presets = GRADIENT_PRESETS_15);
     QComboBox*         makeSensorCombo(bool includeLiquid = true);
 
-    // ── Persistence ─────────────────────────────────────────────────────────
     void saveConfig();
 
-    // ── Init guard ──────────────────────────────────────────────────────────
-    bool m_ready = false;          // true une fois le constructeur terminé
+    bool m_ready = false;
 
-    // ── Device ──────────────────────────────────────────────────────────────
     NZXTKrakenDevice  m_device;
     QLabel*           m_lblDeviceName = nullptr;
     QLabel*           m_lblStatus     = nullptr;
-    QLabel*           m_updateBanner  = nullptr;   // "Update available" (GitHub)
+    QLabel*           m_updateBanner  = nullptr;
     class UpdateChecker* m_updater    = nullptr;
 
-    // ── Renderer ────────────────────────────────────────────────────────────
     SystemSensors     m_sensors;
     FrameConfig       m_config;
     LCDPreviewWidget* m_preview  = nullptr;
@@ -102,14 +94,12 @@ private:
     QComboBox*        m_modeCombo = nullptr;
     QSlider*          m_brightnessSlider = nullptr;
 
-    // ── Media container (Upload + Browse + helper text) ─────────────────────
     QWidget*          m_mediaContainer = nullptr;
     QPushButton*      m_btnUpload      = nullptr;
     QPushButton*      m_btnBrowse      = nullptr;
     QPushButton*      m_btnRemove      = nullptr;
     QLabel*           m_lblMediaHelper = nullptr;
 
-    // ── Panels ──────────────────────────────────────────────────────────────
     QWidget*          m_panelImageGIF = nullptr;
     QWidget*          m_panelSingle   = nullptr;
     QWidget*          m_panelDual     = nullptr;
@@ -119,13 +109,10 @@ private:
     QWidget*          m_panelNowPlaying = nullptr;
     QStackedWidget*   m_stack         = nullptr;
 
-    // ── Timers ──────────────────────────────────────────────────────────────
     QThread*          m_thread = nullptr;
     KrakenWorker*     m_worker = nullptr;
-    QTimer*           m_saveTimer = nullptr;   // debounce écriture settings.json
+    QTimer*           m_saveTimer = nullptr;
 
-    // ── Audio WASAPI loopback ───────────────────────────────────────────────
-    // (WASAPI deplace dans KrakenWorker)
     bool m_darkTheme = true;
 };
 

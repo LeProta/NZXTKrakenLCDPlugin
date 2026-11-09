@@ -5,9 +5,6 @@
 #include <QImage>
 #include <string>
 
-// ─── Copie exacte de OpenRGBPluginInterface.h (API version 4 / OpenRGB 1.0) ──
-// Ne pas modifier — doit correspondre à la version dans le dossier OpenRGB-source
-
 #define OpenRGBPluginInterface_IID  "com.OpenRGBPluginInterface"
 #define OPENRGB_PLUGIN_API_VERSION  4
 
@@ -34,7 +31,7 @@ struct OpenRGBPluginInfo
     QImage          TabIcon;        // 16×16
 };
 
-class ResourceManagerInterface;    // forward — défini dans OpenRGB-source
+class ResourceManagerInterface;
 
 class OpenRGBPluginInterface
 {
@@ -44,13 +41,12 @@ public:
     virtual unsigned int        GetPluginAPIVersion()                                   = 0;
     virtual void                Load(ResourceManagerInterface* resource_manager_ptr)    = 0;
     virtual QWidget*            GetWidget()                                             = 0;
-    virtual QMenu*              GetTrayMenu()                                           = 0;  // pas de paramètre
+    virtual QMenu*              GetTrayMenu()                                           = 0;
     virtual void                Unload()                                                = 0;
 };
 
 Q_DECLARE_INTERFACE(OpenRGBPluginInterface, OpenRGBPluginInterface_IID)
 
-// ─── Notre plugin ─────────────────────────────────────────────────────────────
 namespace NZXTKraken { class KrakenLCDWidget; }
 
 class NZXTKrakenLCDPlugin

@@ -1,6 +1,3 @@
-# Banc de mesure du rendu/encodage LCD (sans matériel).
-#   cmake -S tests -B build-bench -G "NMake Makefiles" -DLHWM_WRAPPER_DIR=<dossier lhwm-cpp-wrapper>
-#   cmake --build build-bench && build-bench\bench_render.exe 200
 cmake_minimum_required(VERSION 3.16)
 set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 project(NZXTKrakenLCDBench LANGUAGES CXX)

@@ -26,26 +26,20 @@
 
 namespace NZXTKraken {
 
-// ════════════════════════════════════════════════════════════════════════════
-// Patch : Opérateur d'égalité pour GradStop
-// ════════════════════════════════════════════════════════════════════════════
 inline bool operator==(const GradStop& a, const GradStop& b) {
     return (a.offset == b.offset) && (a.color == b.color);
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// Helper pour le thème (OpenRGB Dark/Light)
-// ════════════════════════════════════════════════════════════════════════════
 namespace {
     struct PopoverPalette {
-        QString bg;             // Fond principal du popover
-        QString historyBg;      // Fond spécifique (utilisé uniquement pour les onglets Text/Outline)
-        QString surface;        // Boutons et champs
-        QString border;         // Bordures séparatrices
+        QString bg;
+        QString historyBg;
+        QString surface;
+        QString border;
         QString text;
         QString textMuted;
         QString hover;
-        QString tabActiveBorder;// Bordure de l'onglet actif
+        QString tabActiveBorder;
         bool    dark;
     };
 
@@ -57,33 +51,30 @@ namespace {
         if (dark) {
             return {
                 "#111113",   // bg
-                "#1A1A1E",   // historyBg (uniquement pour le fond des onglets)
+                "#1A1A1E",
                 "#1F1F23",   // surface
-                "#2A2A2E",   // border
-                "#FFFFFF",   // text
+                "#2A2A2E",
+                "#FFFFFF",
                 "#666666",   // textMuted
-                "#22222A",   // hover
-                "#FFFFFF",   // tabActiveBorder (Blanc en mode dark)
+                "#22222A",
+                "#FFFFFF",
                 true
             };
         }
         return {
             "#F0F0F2",   // bg
-            "#E6E6E9",   // historyBg (uniquement pour le fond des onglets)
+            "#E6E6E9",
             "#EBEBEE",   // surface
-            "#D0D0D4",   // border
-            "#1A1A1E",   // text
+            "#D0D0D4",
+            "#1A1A1E",
             "#888888",   // textMuted
-            "#DDDDE0",   // hover
-            "#000000",   // tabActiveBorder (Noir en mode clair)
+            "#DDDDE0",
+            "#000000",
             false
         };
     }
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// Historiques globaux
-// ════════════════════════════════════════════════════════════════════════════
 static QList<QColor> s_colorHistory;
 static void pushHistory(const QColor& c)
 {
@@ -119,9 +110,6 @@ void kSetGradientHistory(const QList<GradientStops>& list) {
     }
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// ColorSwatchButton
-// ════════════════════════════════════════════════════════════════════════════
 ColorSwatchButton::ColorSwatchButton(QWidget* parent) : QPushButton(parent)
 {
     setFixedSize(32, 24);
@@ -161,55 +149,36 @@ void ColorSwatchButton::leaveEvent(QEvent* e)
 void ColorSwatchButton::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
-    // On désactive l'antialiasing pour avoir des bords ultra-nets (pixel perfect)
     p.setRenderHint(QPainter::Antialiasing, false);
 
-    // CORRECTION : On utilise la palette globale de l'application pour savoir si 
-    // l'UI est sombre. Ça évite le bug du bouton transparent.
     QColor globalBg = QApplication::palette().color(QPalette::Window);
     bool dark = globalBg.lightnessF() < 0.5;
     
-    // Couleurs d'outline reprises des panels de couleurs (palette popover
-    // "border") : un gris foncé et un gris clair, jamais du noir/blanc pur.
     const QColor OUTLINE_DARK  = QColor("#2A2A2E");
     const QColor OUTLINE_LIGHT = QColor("#D0D0D4");
 
-    // Contour des éléments de l'UI générale : gris foncé en thème sombre,
-    // gris clair en thème clair (mêmes couleurs que les outlines des panels).
     QColor borderCol = dark ? OUTLINE_DARK : OUTLINE_LIGHT;
 
-    // Pointillés des bordures "invisible" (outline absent) : même principe que
-    // dans les panels — gris foncé si le remplissage est clair, gris clair s'il
-    // est foncé (pas de noir/blanc pur). Un remplissage transparent est rendu
-    // sur fond blanc, donc traité comme clair → pointillés foncés.
     auto dashColorFor = [&](const QColor& fill) -> QColor {
         if (fill.alpha() == 0) return OUTLINE_DARK;
         return fill.lightnessF() >= 0.5 ? OUTLINE_DARK : OUTLINE_LIGHT;
     };
 
     bool isPopover = property("popoverStyle").toBool();
-    QRect r = rect(); // On utilise QRect (entiers) au lieu de QRectF pour un rendu parfait
+    QRect r = rect();
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // ASTUCE : Fonction maison pour dessiner la bordure STRICTEMENT vers l'intérieur.
-    // L'extérieur de la case (r) ne bougera jamais, le grossissement se fait en dedans.
-    // ──────────────────────────────────────────────────────────────────────────
     auto drawInsideBorder = [&](const QRect& box, const QColor& color, int thickness) {
-        p.fillRect(box.x(), box.y(), box.width(), thickness, color); // Haut
-        p.fillRect(box.x(), box.y() + box.height() - thickness, box.width(), thickness, color); // Bas
-        p.fillRect(box.x(), box.y() + thickness, thickness, box.height() - 2 * thickness, color); // Gauche
-        p.fillRect(box.x() + box.width() - thickness, box.y() + thickness, thickness, box.height() - 2 * thickness, color); // Droite
+        p.fillRect(box.x(), box.y(), box.width(), thickness, color);
+        p.fillRect(box.x(), box.y() + box.height() - thickness, box.width(), thickness, color);
+        p.fillRect(box.x(), box.y() + thickness, thickness, box.height() - 2 * thickness, color);
+        p.fillRect(box.x() + box.width() - thickness, box.y() + thickness, thickness, box.height() - 2 * thickness, color);
     };
 
     if (isPopover) {
-        // Le contour des swatches reprend la couleur d'outline des boutons
-        // (border), centralisée plus haut : OUTLINE_DARK / OUTLINE_LIGHT.
         const QColor popBorderCol = dark ? OUTLINE_DARK : OUTLINE_LIGHT;
         if (m_hovered) {
-            // Hover : seul le contour s'élargit (2px) ; la couleur touche la
-            // bordure, aucun gap d'une autre couleur n'apparaît.
             drawInsideBorder(r, popBorderCol, 2);
-            QRect innerR = r.adjusted(2, 2, -2, -2); // 2px de bordure, pas de gap
+            QRect innerR = r.adjusted(2, 2, -2, -2);
 
             if (m_kind == Gradient) {
                 p.fillRect(innerR, makeLinearGradient(innerR, m_stops));
@@ -223,9 +192,8 @@ void ColorSwatchButton::paintEvent(QPaintEvent*)
                 }
             }
         } else {
-            // Normal : bordure de 1px, PAS DE GAP (la couleur touche la bordure)
             drawInsideBorder(r, popBorderCol, 1);
-            QRect innerR = r.adjusted(1, 1, -1, -1); // 1px d'écart (juste la bordure)
+            QRect innerR = r.adjusted(1, 1, -1, -1);
 
             if (m_kind == Gradient) {
                 p.fillRect(innerR, makeLinearGradient(innerR, m_stops));
@@ -240,8 +208,6 @@ void ColorSwatchButton::paintEvent(QPaintEvent*)
             }
         }
     } else {
-        // STYLE UI GENERALE (comme les rectangles de ta page principale)
-        // Pas d'effet de grossissement au survol ici (réservé aux popovers).
         int borderW = 1;
         
         if (m_kind == Gradient) {
@@ -250,8 +216,6 @@ void ColorSwatchButton::paintEvent(QPaintEvent*)
         } else if (m_kind == FillOutline) {
             p.fillRect(r, m_fill);
             if (m_outline.alpha() == 0) {
-                // Bordure "invisible" : pointillé fin (1px), couleur contrastée
-                // selon le remplissage (clair → noir, foncé → blanc).
                 p.setBrush(Qt::NoBrush);
                 p.setPen(QPen(dashColorFor(m_fill), 1, Qt::DashLine));
                 p.drawRect(QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5));
@@ -259,9 +223,7 @@ void ColorSwatchButton::paintEvent(QPaintEvent*)
                 drawInsideBorder(r, m_outline, borderW + 1); 
             }
         } else {
-            // Solid
             if (m_fill.alpha() == 0) {
-                // Couleur "transparente" : fond blanc + pointillé contrasté (noir).
                 p.fillRect(r, Qt::white);
                 p.setBrush(Qt::NoBrush);
                 p.setPen(QPen(dashColorFor(m_fill), 1, Qt::DashLine));
@@ -274,9 +236,6 @@ void ColorSwatchButton::paintEvent(QPaintEvent*)
     }
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// SvPad / HueSlider / CustomColorPicker / GradientStopsEditor
-// ════════════════════════════════════════════════════════════════════════════
 SvPad::SvPad(QWidget* parent) : QWidget(parent) {
     setMinimumSize(190, 110); setCursor(Qt::CrossCursor);
 }
@@ -324,9 +283,6 @@ void HueSlider::paintEvent(QPaintEvent*) {
     g.setColorAt(1.0,     QColor(0xFF,0,0));
     QPainterPath path; path.addRoundedRect(r, r.height()/2, r.height()/2);
     p.fillPath(path, g);
-    // Garde la bulle entièrement visible (au-dessus du fond) même aux
-    // extrémités : on borne le centre pour que le cercle (rayon 6 + 1px de
-    // contour) ne déborde pas hors du widget, où il serait rogné.
     const qreal handleR = 6.0;
     const qreal margin  = handleR + 1.0;
     const qreal cx = std::clamp(qreal(m_hue) / 360.0 * width(), margin, qreal(width()) - margin);
@@ -339,7 +295,6 @@ CustomColorPicker::CustomColorPicker(QWidget* parent) : QWidget(parent) {
     m_sv = new SvPad(this); m_hueSlider = new HueSlider(this);
     lay->addWidget(m_sv); lay->addWidget(m_hueSlider);
     auto* inputs = new QHBoxLayout; inputs->setSpacing(4);
-    // Champs Hex/R/G/B derives de la palette popover (suivent le theme OpenRGB).
     const auto pal = resolvePopoverPalette(this);
     const QString inputBg = pal.dark ? QStringLiteral("#0A0A0C") : QStringLiteral("#FFFFFF");
     auto mkLbl = [pal](const QString& s) { auto* l = new QLabel(s); l->setStyleSheet(QString("color:%1;font-size:10px;").arg(pal.textMuted)); return l; };
@@ -408,10 +363,10 @@ void GradientStopsEditor::paintEvent(QPaintEvent*) {
 }
 void GradientStopsEditor::mousePressEvent(QMouseEvent* e) {
     const QRectF bar = barRect();
-    if (e->button() == Qt::LeftButton) {            // clic gauche = sélectionner (+ déplacer en glissant)
+    if (e->button() == Qt::LeftButton) {
         int idx = stopAtPos(e->pos());
         if (idx >= 0) { m_selected = idx; m_dragging = idx; emit selectedChanged(idx); update(); }
-        else if (bar.contains(e->pos())) {          // barre vide : ajoute un stop puis le sélectionne
+        else if (bar.contains(e->pos())) {
             const float pct = std::clamp(float(e->pos().x() - bar.left()) / float(bar.width()), 0.f, 1.f) * 100.f;
             const QColor c = colorAtPercent(m_stops, pct);
             m_stops.append({ pct, c }); m_selected = m_stops.size() - 1; m_dragging = m_selected;
@@ -419,7 +374,7 @@ void GradientStopsEditor::mousePressEvent(QMouseEvent* e) {
         }
         return;
     }
-    if (e->button() == Qt::RightButton) {           // clic droit = supprimer le stop sous le curseur
+    if (e->button() == Qt::RightButton) {
         int idx = stopAtPos(e->pos());
         if (idx >= 0 && m_stops.size() > 1) { m_stops.removeAt(idx); if (m_selected >= m_stops.size()) m_selected = m_stops.size() - 1; emit stopsChanged(m_stops); emit selectedChanged(m_selected); update(); }
         return;
@@ -428,7 +383,6 @@ void GradientStopsEditor::mousePressEvent(QMouseEvent* e) {
 void GradientStopsEditor::mouseMoveEvent(QMouseEvent* e) { if (m_dragging < 0 || !(e->buttons() & Qt::LeftButton)) return; const QRectF bar = barRect(); const float pct = std::clamp(float(e->pos().x() - bar.left()) / float(bar.width()), 0.f, 1.f) * 100.f; if (m_dragging < m_stops.size()) { m_stops[m_dragging].offset = pct; emit stopsChanged(m_stops); } update(); }
 void GradientStopsEditor::mouseReleaseEvent(QMouseEvent*) { m_dragging = -1; m_markDelete = false; update(); }
 void GradientStopsEditor::contextMenuEvent(QContextMenuEvent* e) { e->accept(); }
-
 
 // ════════════════════════════════════════════════════════════════════════════
 // KrakenColorPopover
@@ -456,7 +410,6 @@ void KrakenColorPopover::paintEvent(QPaintEvent* e)
     p.setRenderHint(QPainter::Antialiasing);
     const auto pal = resolvePopoverPalette(parentWidget());
     
-    // Dessin du fond global
     p.setBrush(QColor(pal.bg));
     p.setPen(QPen(QColor(pal.border), 1));
     p.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 10, 10);
@@ -467,7 +420,6 @@ void KrakenColorPopover::paintEvent(QPaintEvent* e)
 void KrakenColorPopover::anchorTo(QWidget* widget) {
     if (!widget) return; QPoint global = widget->mapToGlobal(QPoint(0, widget->height())); adjustSize();
     int x = global.x() + widget->width()/2 - width()/2; int y = global.y() + 6;
-    // Écran de l'ANCRE, pas le primaire : sinon popover mal placé en multi-écrans.
     QScreen* scr = QGuiApplication::screenAt(global);
     if (!scr) scr = QGuiApplication::primaryScreen();
     QRect avail = scr ? scr->availableGeometry() : QRect(0,0,1920,1080);
@@ -476,21 +428,14 @@ void KrakenColorPopover::anchorTo(QWidget* widget) {
     if (y + height() > avail.bottom() - 6) { y = widget->mapToGlobal(QPoint(0,0)).y() - height() - 6; }
     move(x, y);
 }
-// (eventFilter/hideEvent supprimés : le filtre installé sur qApp retournait
-// toujours false — inutile, Qt::Popup ferme déjà sur clic extérieur.)
 void KrakenColorPopover::showEvent(QShowEvent* e) { QFrame::showEvent(e); setFocus(); }
 void KrakenColorPopover::keyPressEvent(QKeyEvent* e) { if (e->key() == Qt::Key_Escape) { hide(); return; } QFrame::keyPressEvent(e); }
 
-
-// ════════════════════════════════════════════════════════════════════════════
-// Helpers UI partagés
-// ════════════════════════════════════════════════════════════════════════════
 static QWidget* makeHistoryBar(QWidget* parent, const QList<QColor>& history, std::function<void(QColor)> onPick)
 {
     const auto pal = resolvePopoverPalette(parent);
     auto* container = new QFrame; container->setObjectName("HistorySection");
     
-    // Fond transparent pour s'intégrer uniformément
     container->setStyleSheet("#HistorySection { background:transparent; border:none; }");
     
     auto* lay = new QHBoxLayout(container); lay->setContentsMargins(16, 12, 16, 12); lay->setSpacing(8);
@@ -525,7 +470,6 @@ static QWidget* makeGradientHistoryBar(QWidget* parent, const QList<GradientStop
     const auto pal = resolvePopoverPalette(parent);
     auto* container = new QFrame; container->setObjectName("GradientHistorySection");
     
-    // Fond transparent pour s'intégrer uniformément
     container->setStyleSheet("#GradientHistorySection { background:transparent; border:none; }");
     
     auto* lay = new QHBoxLayout(container); lay->setContentsMargins(16, 12, 16, 12); lay->setSpacing(8);
@@ -590,7 +534,6 @@ static QGridLayout* makeGradientSwatchGrid(QWidget* parent, const QList<Gradient
     return grid;
 }
 
-
 // ════════════════════════════════════════════════════════════════════════════
 // SolidColorPopover
 // ════════════════════════════════════════════════════════════════════════════
@@ -607,7 +550,6 @@ SolidColorPopover::SolidColorPopover(const QColor& initial, QWidget* parent)
     auto* stack = new QStackedWidget;
     const auto pal = resolvePopoverPalette(this);
 
-    // Page 0 : Swatches
     auto* swatchPage = new QWidget;
     auto* swatchLay = new QVBoxLayout(swatchPage);
     swatchLay->setContentsMargins(0,0,0,0); swatchLay->setSpacing(4);
@@ -625,7 +567,6 @@ SolidColorPopover::SolidColorPopover(const QColor& initial, QWidget* parent)
     swRow->addWidget(btnCustom); swRow->addWidget(btnCancel0); swatchLay->addLayout(swRow);
     stack->addWidget(swatchPage);
 
-    // Page 1 : Custom
     auto* customPage = new QWidget;
     auto* customLay = new QVBoxLayout(customPage);
     customLay->setContentsMargins(16, 16, 16, 0); customLay->setSpacing(10);
@@ -671,12 +612,10 @@ TextColorPopover::TextColorPopover(const QColor& fill, const QColor& outline, QW
     const auto pal = resolvePopoverPalette(this);
     auto* rootStack = new QStackedWidget;
 
-    // ──────────────── PAGE 0 : VUE SWATCH (Avec Onglets Text / Outline) ────────────────
     auto* pageSwatch = new QWidget;
     auto* laySwatch = new QVBoxLayout(pageSwatch);
     laySwatch->setContentsMargins(0,0,0,0); laySwatch->setSpacing(4);
 
-    // Onglets Centrés (Leur conteneur garde la couleur de fond spécifique historyBg)
     auto* tabsContainer = new QFrame;
     tabsContainer->setStyleSheet(QString(
         "background:%1; border:none; border-top-left-radius: 9px; border-top-right-radius: 9px;"
@@ -697,7 +636,7 @@ TextColorPopover::TextColorPopover(const QColor& fill, const QColor& outline, QW
             "font-size:12px;font-weight:%3;}"
             "QPushButton:hover{color:%4;}")
             .arg(active ? pal.text : pal.textMuted,
-                 active ? pal.tabActiveBorder : "transparent", // Utilisation de la nouvelle palette
+                 active ? pal.tabActiveBorder : "transparent",
                  active ? QStringLiteral("600") : QStringLiteral("400"),
                  pal.text));
     };
@@ -711,7 +650,6 @@ TextColorPopover::TextColorPopover(const QColor& fill, const QColor& outline, QW
     auto onPickText = [this](QColor c) { m_fill = c; pushHistory(c); m_accepted = true; hide(); };
     auto onPickOutl = [this](QColor c) { m_outline = c; pushHistory(c); m_accepted = true; hide(); };
 
-    // --- Grille Text ---
     auto* gridText = new QWidget; auto* lText = new QVBoxLayout(gridText);
     lText->setContentsMargins(0,0,0,0); lText->setSpacing(4);
     
@@ -722,7 +660,6 @@ TextColorPopover::TextColorPopover(const QColor& fill, const QColor& outline, QW
     lText->addWidget(sep1); lText->addWidget(wrapInPresetSection(this, makeSwatchGrid(this, SWATCH_FILL_15, false, onPickText)));
     gridStack->addWidget(gridText);
 
-    // --- Grille Outline ---
     auto* gridOutl = new QWidget; auto* lOutl = new QVBoxLayout(gridOutl);
     lOutl->setContentsMargins(0,0,0,0); lOutl->setSpacing(4);
     
@@ -735,7 +672,6 @@ TextColorPopover::TextColorPopover(const QColor& fill, const QColor& outline, QW
 
     laySwatch->addWidget(gridStack);
 
-    // Boutons
     auto* swR = new QHBoxLayout;
     swR->setContentsMargins(16, 4, 16, 0);
     auto* btnCustom = new QPushButton("Custom"); auto* btnCancel1 = new QPushButton("Cancel");
@@ -744,7 +680,6 @@ TextColorPopover::TextColorPopover(const QColor& fill, const QColor& outline, QW
 
     rootStack->addWidget(pageSwatch);
 
-    // ──────────────── PAGE 1 : VUE CUSTOM ────────────────
     auto* pageCustom = new QWidget;
     auto* layCustom = new QVBoxLayout(pageCustom);
     layCustom->setContentsMargins(16, 16, 16, 0); layCustom->setSpacing(10);
@@ -760,7 +695,6 @@ TextColorPopover::TextColorPopover(const QColor& fill, const QColor& outline, QW
     rootStack->addWidget(pageCustom);
     root->addWidget(rootStack);
 
-    // ──────────────── CÂBLAGES ────────────────
     auto updateRootStackHeight = [rootStack](int index) {
         for (int i = 0; i < rootStack->count(); ++i) rootStack->widget(i)->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
         rootStack->widget(index)->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum); rootStack->adjustSize();
@@ -819,7 +753,6 @@ GradientPopover::GradientPopover(const GradientStops& initial, const QList<Gradi
     const auto pal = resolvePopoverPalette(this);
     auto* stack = new QStackedWidget;
 
-    // Page 0 : Swatches
     auto* page0 = new QWidget;
     auto* lay0 = new QVBoxLayout(page0);
     lay0->setContentsMargins(0,0,0,0); lay0->setSpacing(4);
@@ -838,7 +771,6 @@ GradientPopover::GradientPopover(const GradientStops& initial, const QList<Gradi
     row0->addWidget(btnCustom0); row0->addWidget(btnCancel0); lay0->addLayout(row0);
     stack->addWidget(page0);
 
-    // Page 1 : Custom
     auto* page1 = new QWidget;
     auto* lay1 = new QVBoxLayout(page1);
     lay1->setContentsMargins(16, 16, 16, 0); lay1->setSpacing(10);

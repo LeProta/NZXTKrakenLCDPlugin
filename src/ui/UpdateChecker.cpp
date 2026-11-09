@@ -22,16 +22,12 @@
 
 namespace NZXTKraken {
 
-// Fichier MIROIR de src/ui/UpdateChecker.cpp du plugin Pump : toute correction
-// ici doit y être reportée. Seules différences : les 4 constantes ci-dessous
-// et le namespace.
 static const wchar_t* kApiPath   =
     L"/repos/LeProta/NZXTKrakenLCDPlugin/releases/latest";
 static const wchar_t* kUserAgent = L"NZXTKrakenLCDPlugin";
 static const char*    kLogTag    = "[KrakenLCD/Update]";
 static const QString  kConfigSub = QStringLiteral("/NZXTKrakenLCD");
 
-// "v1.2.3-beta" -> [1, 2, 3] (préfixe v/V ignoré, suffixe pré-release ignoré).
 static QVector<int> parseSemver(const QString& s)
 {
     QString v = s.trimmed();
@@ -54,8 +50,6 @@ static bool isNewer(const QString& latest, const QString& current)
     return false;
 }
 
-// GET HTTPS bloquant via WinHTTP. Renvoie le corps, ou vide en cas d'échec.
-// Timeouts courts : borne le temps de vie du thread réseau détaché.
 static std::string httpsGet(const wchar_t* host, const wchar_t* path)
 {
     std::string body;
@@ -95,10 +89,6 @@ UpdateChecker::UpdateChecker(QObject* parent) : QObject(parent) {}
 
 void UpdateChecker::check(const QString& currentVersion)
 {
-    // Épingle la DLL en mémoire (une fois) : le thread réseau et la lambda
-    // postée à l'event loop exécutent du code du plugin — un unload pendant
-    // la requête exécuterait des pages démappées. PIN = DLL résidente jusqu'à
-    // la fin du process (coût mémoire négligeable, crash impossible).
     static const bool pinned = [] {
         HMODULE mod = nullptr;
         return GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
@@ -108,8 +98,6 @@ void UpdateChecker::check(const QString& currentVersion)
     if (!pinned)
         return;
 
-    // Cache disque 6 h (GitHub limite à 60 req/h non authentifié) : le dernier
-    // tag vu est réutilisé — la bannière s'affiche même sans requête réseau.
     const QString cachePath = OpenRGBSettings::configDir() + kConfigSub
                               + QStringLiteral("/update_check.json");
     {
@@ -123,12 +111,10 @@ void UpdateChecker::check(const QString& currentVersion)
             if (!tag.isEmpty() && isNewer(tag, currentVersion))
                 emit updateAvailable(tag, url);
             if (QDateTime::currentSecsSinceEpoch() - checked < 6 * 3600)
-                return;   // cache frais : pas de requête
+                return;
         }
     }
 
-    // Le QPointer n'est écrit (ici) et déréférencé (lambda GUI) QUE sur le
-    // thread GUI — le thread réseau ne copie que le shared_ptr (thread-safe).
     struct Ctx { QPointer<UpdateChecker> self; QString version; QString cache; };
     auto ctx = std::make_shared<Ctx>();
     ctx->self    = this;
@@ -139,7 +125,7 @@ void UpdateChecker::check(const QString& currentVersion)
         const std::string body = httpsGet(L"api.github.com", kApiPath);
         QCoreApplication* app = QCoreApplication::instance();
         if (!app)
-            return;   // arrêt du process en cours
+            return;
         QMetaObject::invokeMethod(app, [ctx, body] {
             const QJsonObject obj =
                 QJsonDocument::fromJson(QByteArray::fromStdString(body)).object();

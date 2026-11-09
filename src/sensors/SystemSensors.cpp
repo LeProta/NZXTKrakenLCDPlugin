@@ -1,13 +1,7 @@
 // =============================================================================
-//  SystemSensors.cpp — Acquisition des capteurs systeme (Windows uniquement)
 //
-//  LibreHardwareMonitor embarque via lhwm-cpp-wrapper (lib statique) +
-//  lhwm-wrapper.dll (assembly .NET, a placer a cote d'OpenRGB.exe). Aucun
-//  OHM/LHM externe. Mapping AUTOMATIQUE par prefixe d'identifiant + type +
-//  preference de nom (cf. buildSensorMap()). Liquide : fourni par le Kraken
 //  via HID (setLiquidTemp).
 //
-//  Regle absolue : aucun crash. Toute erreur -> SensorValue.available = false.
 // =============================================================================
 #include "SystemSensors.h"
 #include <QMutexLocker>
@@ -28,10 +22,6 @@
 namespace {
 // =============================================================================
 
-// --- Categorie materielle d'apres le prefixe d'identifiant LHM ---------------
-//   /amdcpu/...  /intelcpu/...                     -> CPU
-//   /gpu-amd/...  /gpu-nvidia/...  /gpu-intel/...   -> GPU
-//   /ram/...                                        -> RAM
 static bool idIsCpu(const std::string& id) {
     return id.rfind("/amdcpu/", 0) == 0 || id.rfind("/intelcpu/", 0) == 0;
 }
@@ -39,24 +29,15 @@ static bool idIsGpu(const std::string& id) {
     return id.rfind("/gpu-amd/", 0) == 0
         || id.rfind("/gpu-nvidia/", 0) == 0
         || id.rfind("/gpu-intel/", 0) == 0
-        || id.rfind("/gpu/", 0) == 0;   // securite (anciennes nomenclatures)
+        || id.rfind("/gpu/", 0) == 0;
 }
 static bool idIsRam(const std::string& id) {
     return id.rfind("/ram/", 0) == 0;
 }
 
-// --- Epinglage des UMD graphiques -------------------------------------------
-//   LHM (AmdGpu/ADL, compteurs PDH "GPU Engine") charge le user-mode driver du
-//   pilote puis le laisse se decharger ; le poll suivant rappelle dedans ->
-//   0xC0000005 dans "<UMD>.DLL_unloaded" (cf. AMDXN64.DLL). GET_MODULE_HANDLE_EX_FLAG_PIN
-//   incremente definitivement le refcount : le module ne sera plus libere.
-//   Idempotent et sans effet si le module n'est pas (encore) charge, d'ou
-//   l'appel a chaque poll tant qu'il en reste a epingler.
 #ifdef _WIN32
 static void pinGpuDriverModules()
 {
-    // ponytail: liste fixe des UMD connus ; ajouter le nom du module si un
-    // autre pilote presente le meme crash "*_unloaded".
     static const wchar_t* kModules[] = {
         L"amdxn64.dll", L"amdxx64.dll", L"atiadlxx.dll", L"aticfx64.dll",
         L"nvoglv64.dll", L"nvapi64.dll", L"igd10iumd64.dll",
@@ -68,7 +49,7 @@ static void pinGpuDriverModules()
         if (pinned[i]) continue;
         HMODULE h = nullptr;
         if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN, kModules[i], &h))
-            pinned[i] = true;   // charge et desormais epingle
+            pinned[i] = true;
     }
 }
 #else
@@ -113,7 +94,6 @@ void SystemSensors::stopPolling()
 void SystemSensors::shutdown()
 {
     stopPolling();
-    // Rien a liberer : l'assembly .NET (lhwm-wrapper.dll) gere son cycle de vie.
 }
 
 SensorValue SystemSensors::read(SensorType type) const
@@ -129,24 +109,20 @@ void SystemSensors::setLiquidTemp(float celsius)
     m_values[SensorType::LIQUID_TEMP] = { celsius, "°C", ok };
 }
 
-// --- Resolution des identifiants LHM (executee une seule fois) ---------------
 void SystemSensors::buildSensorMap()
 {
     if (m_mapBuilt) return;
     m_mapBuilt = true;
 
-
     struct Entry { std::string name, type, id; };
     std::vector<Entry> all;
 
     try {
-        // [nomMateriel, [(nomCapteur, typeCapteur, identifiant), ...]]
         auto hsMap = LHWM::GetHardwareSensorMap();
         pinGpuDriverModules();
         for (const auto& hw : hsMap) {
             for (const auto& s : hw.second) {
                 all.push_back({ std::get<0>(s), std::get<1>(s), std::get<2>(s) });
-                // Dump diagnostic (une fois, niveau Info) — sert a valider/affiner.
                 qInfo().noquote()
                     << "[KrakenLCD/Sensors] LHM" << QString::fromStdString(hw.first)
                     << "|"  << QString::fromStdString(std::get<1>(s))
@@ -167,9 +143,6 @@ void SystemSensors::buildSensorMap()
         return;
     }
 
-    // Selecteur : parmi les entrees (categorie + type), prend la 1re dont le nom
-    // correspond a une preference (egalite exacte puis prefixe), sinon la 1re ;
-    // en excluant les noms contenant un motif d'exclusion.
     auto pick = [&](bool(*cat)(const std::string&), const char* type,
                     std::initializer_list<const char*> prefs,
                     std::initializer_list<const char*> excludes) -> std::string {
@@ -183,15 +156,15 @@ void SystemSensors::buildSensorMap()
             if (!ex) cand.push_back(&e);
         }
         if (cand.empty()) return std::string();
-        for (const char* p : prefs)                  // egalite exacte
+        for (const char* p : prefs)
             for (const Entry* e : cand)
                 if (e->name == p) return e->id;
-        for (const char* p : prefs) {                 // sinon prefixe
+        for (const char* p : prefs) {
             const std::string ps(p);
             for (const Entry* e : cand)
                 if (e->name.rfind(ps, 0) == 0) return e->id;
         }
-        return cand.front()->id;                       // defaut : 1re entree
+        return cand.front()->id;
     };
 
     m_ids[SensorType::CPU_TEMP]  = pick(idIsCpu, "Temperature",
@@ -239,12 +212,12 @@ void SystemSensors::pollOnce()
     };
 
     SensorValue cpuT = readId(SensorType::CPU_TEMP,  "°C",  false);
-    if (cpuT.available && (cpuT.value <= 0.f || cpuT.value >= 150.f)) cpuT = SensorValue{};  // 0 = pas de donnee -> N/A
+    if (cpuT.available && (cpuT.value <= 0.f || cpuT.value >= 150.f)) cpuT = SensorValue{};
     SensorValue cpuL = readId(SensorType::CPU_LOAD,  "%",   true);
     SensorValue cpuC = readId(SensorType::CPU_CLOCK, "MHz", false);
     if (cpuC.available && cpuC.value <= 0.f) cpuC = SensorValue{};
     SensorValue gpuT = readId(SensorType::GPU_TEMP,  "°C",  false);
-    if (gpuT.available && (gpuT.value <= 0.f || gpuT.value >= 150.f)) gpuT = SensorValue{};  // 0 = pas de donnee -> N/A
+    if (gpuT.available && (gpuT.value <= 0.f || gpuT.value >= 150.f)) gpuT = SensorValue{};
     SensorValue gpuL = readId(SensorType::GPU_LOAD,  "%",   true);
     SensorValue gpuC = readId(SensorType::GPU_CLOCK, "MHz", false);
     if (gpuC.available && gpuC.value <= 0.f) gpuC = SensorValue{};
@@ -259,7 +232,6 @@ void SystemSensors::pollOnce()
         m_values[SensorType::GPU_LOAD]  = gpuL;
         m_values[SensorType::GPU_CLOCK] = gpuC;
         m_values[SensorType::MEM_LOAD]  = memL;
-        // LIQUID_TEMP : laisse tel quel (alimente par setLiquidTemp via HID).
     }
 }
 

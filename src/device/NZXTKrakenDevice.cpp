@@ -45,10 +45,19 @@ int NZXTKrakenDevice::hidReportLen() const
 // ── Détection / ouverture ────────────────────────────────────────────────────
 bool NZXTKrakenDevice::open()
 {
+    // Seuls les modèles présents en HID sont essayés (l'interface HID est requise
+    // de toute façon) : sinon chaque modèle absent produisait 4 warnings
+    // trompeurs ("driver replaced by WinUSB") et ~20 ms de sondage au démarrage.
+    hid_device_info* list = hid_enumerate(0x1E71, 0);
+    bool ok = false;
     for (const auto& dev : SUPPORTED_DEVICES) {
-        if (open(dev.vid, dev.pid)) return true;
+        bool present = false;
+        for (hid_device_info* p = list; p && !present; p = p->next)
+            present = (p->product_id == dev.pid);
+        if (present && open(dev.vid, dev.pid)) { ok = true; break; }
     }
-    return false;
+    hid_free_enumeration(list);
+    return ok;
 }
 
 bool NZXTKrakenDevice::open(uint16_t vid, uint16_t pid)

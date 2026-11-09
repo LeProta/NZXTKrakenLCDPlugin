@@ -23,13 +23,16 @@
 
 namespace NZXTKraken {
 
+// Fond ANIMÉ (GIF) : seul cas média qui justifie la cadence max de l'écran.
+// Une image fixe rendue à 60 Hz renvoyait la même frame (~690 Ko en Q565) 60×/s.
 static bool modeUsesMedia(const FrameConfig& cfg)
 {
+    const auto isGif = [](const QString& p) { return p.endsWith(QLatin1String(".gif"), Qt::CaseInsensitive); };
     switch (cfg.mode) {
-        case DisplayMode::IMAGE_GIF:          return !cfg.gifPath.isEmpty();
-        case DisplayMode::SINGLE_INFOGRAPHIC: return !cfg.single.gifPath.isEmpty();
-        case DisplayMode::DUAL_INFOGRAPHIC:   return !cfg.dual.gifPath.isEmpty();
-        case DisplayMode::TRIPLE_INFOGRAPHIC: return !cfg.triple.gifPath.isEmpty();
+        case DisplayMode::IMAGE_GIF:          return isGif(cfg.gifPath);
+        case DisplayMode::SINGLE_INFOGRAPHIC: return isGif(cfg.single.gifPath);
+        case DisplayMode::DUAL_INFOGRAPHIC:   return isGif(cfg.dual.gifPath);
+        case DisplayMode::TRIPLE_INFOGRAPHIC: return isGif(cfg.triple.gifPath);
         default:                              return false;
     }
 }
@@ -67,12 +70,13 @@ void KrakenWorker::setConfig(const FrameConfig& cfg)
     bool modeChanged;
     {
         QMutexLocker lk(&m_cfgMutex);
-        modeChanged = (cfg.mode != m_cfg.mode);
+        modeChanged = (cfg.mode != m_cfg.mode)
+                   || (modeUsesMedia(cfg) != modeUsesMedia(m_cfg));   // GIF <-> fixe
         m_cfg = cfg;
     }
-    // La cadence + WASAPI dépendent du mode : on (re)calcule sur le thread du
-    // worker quand le mode change (applyCadence touche le QTimer, qui a son
-    // affinité sur ce thread).
+    // La cadence + WASAPI dépendent du mode et du fond (GIF ou non) : on
+    // (re)calcule sur le thread du worker (applyCadence touche le QTimer, qui a
+    // son affinité sur ce thread).
     if (modeChanged)
         QMetaObject::invokeMethod(this, "applyCadence", Qt::QueuedConnection);
 }

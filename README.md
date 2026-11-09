@@ -94,36 +94,37 @@ Required to read CPU and motherboard temperatures (ring-0 sensor driver). Liquid
 
 | Tool | Version |
 |------|---------|
-| Visual Studio Build Tools | 2019 / 2022 — *Desktop development with C++* + *.NET Framework 4.x SDK* |
+| Visual Studio Build Tools | 2019 (v142, same toolset as `lhwm-cpp-wrapper.lib`) or 2022 — *Desktop development with C++* |
 | Qt | 5.15.2 `msvc2019_64` |
-| vcpkg | *optional* — only if you prefer system `hidapi` / `libusb` over the bundled import libraries |
-| CMake | ≥ 3.16 |
-| OpenRGB source | 0.9+ |
+| CMake | ≥ 3.16 (the one bundled with Visual Studio works) |
+| hidapi, libusb | headers + import libraries — `vcpkg install hidapi:x64-windows libusb:x64-windows`, or folders with `include/` and `lib/` |
+| [lhwm-wrapper](https://github.com/LeProta/lhwm-wrapper) | cloned **next to** this repository (provides `lhwm-cpp-wrapper.h` and the prebuilt `lhwm-cpp-wrapper.lib`) |
+
+The OpenRGB plugin interface is embedded in `src/NZXTKrakenLCDPlugin.h`: no OpenRGB source tree is needed.
 
 ### Steps
 
-Use an **x64 Native Tools Command Prompt for VS**:
+Use an **x64 Native Tools Command Prompt for VS**, from a short path (NMake cannot open files whose full path exceeds 260 characters):
 
 ```bat
+git clone https://github.com/LeProta/lhwm-wrapper
 git clone https://github.com/LeProta/NZXTKrakenLCDPlugin
 cd NZXTKrakenLCDPlugin
 
 cmake -S . -B build -G "NMake Makefiles" ^
-  -DOPENRGB_INCLUDE_DIR=C:/OpenRGB-source ^
-  -DCMAKE_PREFIX_PATH=C:/Qt/5.15.2/msvc2019_64
+  -DCMAKE_PREFIX_PATH=C:/Qt/5.15.2/msvc2019_64 ^
+  -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake
 
 cmake --build build
 ```
 
 Output: `build/NZXTKrakenLCDPlugin.dll`.
 
-> `hidapi` and `libusb` are resolved in this order: `pkg-config`, then `find_library`,
-> then the import libraries bundled under `third_party/`. No vcpkg install is required.
-> To use your own build instead, pass the vcpkg toolchain:
-> `-DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake`
-
-> The build is forced to Release — `lhwm-cpp-wrapper.lib` is compiled with `/MD` and mixing runtimes causes `LNK2038`.
-
+> Without vcpkg, pass `-DHIDAPI_ROOT=<folder> -DLIBUSB_ROOT=<folder>` instead of the toolchain file.
+> `-DLHWM_WRAPPER_DIR=<folder>` overrides the wrapper location.
+> The build is forced to Release: OpenRGB rejects plugins linked to debug Qt DLLs, and
+> `lhwm-cpp-wrapper.lib` is compiled with `/MD` (mixing runtimes causes `LNK2038`).
+> `/EHa` is required so that `catch (...)` intercepts .NET exceptions raised by the wrapper.
 ---
 
 ## Troubleshooting

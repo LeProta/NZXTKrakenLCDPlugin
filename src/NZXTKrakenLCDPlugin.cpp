@@ -16,6 +16,9 @@
 #include <QDebug>
 #include <QDateTime>
 #include <hidapi/hidapi.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 // ============================================================================
 //  Logging du plugin, integre aux reglages d'OpenRGB
@@ -47,6 +50,7 @@ QtMessageHandler g_prevHandler    = nullptr;
 QMutex           g_logMutex;
 QElapsedTimer    g_clock;                  // base du compteur ms (comme base_clock d'OpenRGB)
 bool             g_installed      = false;
+bool             g_pinnedInChain  = false; // resté chaîné en relai (DLL épinglée)
 bool             g_fileEnabled    = true;  // defaut OpenRGB : fichier ON
 bool             g_consoleEnabled = false; // defaut OpenRGB : console OFF
 int              g_logLevel       = KL_INFO;
@@ -156,8 +160,8 @@ void krakenMessageHandler(QtMsgType type, const QMessageLogContext& ctx, const Q
     const int firstSlash = tag.indexOf('/');
     const QString root = (firstSlash >= 0) ? tag.left(firstSlash) : tag;
 
-    // Message qui ne vient pas du plugin -> relai au handler precedent
-    if (tag.isEmpty() || !isPluginTag(root)) {
+    // Message qui ne vient pas du plugin (ou plugin dechargé) -> relai au handler precedent
+    if (!g_installed || tag.isEmpty() || !isPluginTag(root)) {
         if (g_prevHandler) g_prevHandler(type, ctx, msg);
         else               fprintf(stderr, "%s\n", qPrintable(msg));
         return;
@@ -217,10 +221,11 @@ void installKrakenLogger(const QString& hidVer)
         }
     }
 
-    g_prevHandler = qInstallMessageHandler(krakenMessageHandler);
+    if (!g_pinnedInChain)   // sinon déjà dans la chaîne : ne pas boucler sur nous-mêmes
+        g_prevHandler = qInstallMessageHandler(krakenMessageHandler);
 
     // Entete, meme forme qu'OpenRGB (lignes indentees + separateur de 100 '=')
-    writeRaw(QStringLiteral("    NZXT Kraken LCD plugin v1.0.2"));
+    writeRaw(QStringLiteral("    NZXT Kraken LCD plugin v" NZXT_LCD_VERSION));
     writeRaw(QStringLiteral("    hidapi %1 | Qt %2").arg(hidVer, QString::fromLatin1(qVersion())));
     writeRaw(QStringLiteral("    OpenRGB config: %1").arg(cfgDir));
     writeRaw(QStringLiteral("    Log settings: file=%1  console=%2  loglevel=%3")
@@ -238,13 +243,22 @@ void uninstallKrakenLogger()
     // Restauration respectueuse de la chaîne : si un autre composant a
     // installé SON handler APRÈS le nôtre, le remplacer aveuglément par
     // g_prevHandler l'éjecterait. Dans ce cas on remet le sien en place.
-    // (Limite inhérente aux chaînes de qInstallMessageHandler : s'il forwarde
-    // vers notre handler, son pointeur devient invalide au déchargement de la
-    // DLL — rien de plus propre n'est possible côté plugin.)
     QtMessageHandler cur = qInstallMessageHandler(g_prevHandler);
-    if (cur != krakenMessageHandler)
+    if (cur != krakenMessageHandler) {
+        // Ce handler (ex. plugin Pump) peut relayer vers le nôtre : décharger la
+        // DLL lui laisserait un pointeur pendant (crash au log suivant). On
+        // reste chaîné en relai pur (g_installed = false) et on épingle la DLL.
         qInstallMessageHandler(cur);
-    g_prevHandler = nullptr;
+        g_pinnedInChain = true;
+#ifdef _WIN32
+        HMODULE self = nullptr;
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+                           reinterpret_cast<LPCWSTR>(&krakenMessageHandler), &self);
+#endif
+    } else {
+        g_prevHandler   = nullptr;
+        g_pinnedInChain = false;
+    }
     {
         QMutexLocker lk(&g_logMutex);
         if (g_logFile) { g_logFile->close(); delete g_logFile; g_logFile = nullptr; }

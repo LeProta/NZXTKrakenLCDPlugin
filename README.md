@@ -9,6 +9,13 @@ Drives the round LCD screen of NZXT Kraken Z and Elite coolers from OpenRGB, wit
 
 Requires OpenRGB 1.1. If you are still on OpenRGB 1.0rc3, use [v1.0.6](https://github.com/LeProta/NZXTKrakenLCDPlugin/releases/tag/v1.0.6).
 
+## Versions
+
+| Plugin | OpenRGB | lhwm-wrapper |
+|--------|---------|--------------|
+| 1.1.0 | 1.1 | 1.1.0 or later, 1.2.0 recommended |
+| 1.0.6 | 1.0rc3 | 1.1.0 or later |
+
 ## Features
 
 Screen modes:
@@ -45,7 +52,7 @@ All of them use vendor ID `0x1E71`. Development and testing are done on a Kraken
 ## Installation
 
 1. Download `NZXTKrakenLCDPlugin.dll` from the [releases page](https://github.com/LeProta/NZXTKrakenLCDPlugin/releases).
-2. Download `lhwm-wrapper.dll` from [LeProta/lhwm-wrapper](https://github.com/LeProta/lhwm-wrapper/releases) and put it next to `OpenRGB.exe`. The plugin reads the system sensors through it. The [pump plugin](https://github.com/LeProta/NZXTKrakenPumpPlugin) uses the same file, one copy is enough for both.
+2. Download `lhwm-wrapper.dll` (v1.2.0 recommended) from [LeProta/lhwm-wrapper](https://github.com/LeProta/lhwm-wrapper/releases) and put it next to `OpenRGB.exe`. The plugin reads the system sensors through it. The [pump plugin](https://github.com/LeProta/NZXTKrakenPumpPlugin) uses the same file, one copy is enough for both.
 3. Install [PawnIO](https://pawnio.eu) 2.1.0 or newer. LibreHardwareMonitor needs this driver to read the CPU and motherboard sensors.
 4. In OpenRGB, go to Settings > Plugins > Install plugin and pick the DLL, or copy it to `%APPDATA%\OpenRGB\plugins`. Restart OpenRGB and a "NZXT Kraken LCD" tab shows up.
 5. Run OpenRGB as administrator to get CPU and motherboard temperatures. Coolant temperature, pump and fan RPM and the GPU sensors work without it.

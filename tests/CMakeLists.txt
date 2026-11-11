@@ -5,10 +5,10 @@ project(NZXTKrakenLCDBench LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
-if(NOT DEFINED CMAKE_PREFIX_PATH AND EXISTS "C:/Qt/5.15.2/msvc2019_64")
-    set(CMAKE_PREFIX_PATH "C:/Qt/5.15.2/msvc2019_64")
+if(NOT DEFINED CMAKE_PREFIX_PATH AND EXISTS "C:/Qt/6.8.3/msvc2022_64")
+    set(CMAKE_PREFIX_PATH "C:/Qt/6.8.3/msvc2022_64")
 endif()
-find_package(Qt5 5.15 REQUIRED COMPONENTS Core Gui)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui)
 
 set(SRC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 if(NOT LHWM_WRAPPER_DIR)
@@ -19,5 +19,5 @@ add_executable(bench_render bench_render.cpp
 target_include_directories(bench_render PRIVATE ${SRC} ${LHWM_WRAPPER_DIR})
 target_compile_options(bench_render PRIVATE /EHa /utf-8 /bigobj)
 target_compile_definitions(bench_render PRIVATE NOMINMAX _USE_MATH_DEFINES)
-target_link_libraries(bench_render PRIVATE Qt5::Core Qt5::Gui
+target_link_libraries(bench_render PRIVATE Qt6::Core Qt6::Gui
     "${LHWM_WRAPPER_DIR}/x64/Release/lhwm-cpp-wrapper.lib")

@@ -50,9 +50,9 @@ Keep only plugin files in the plugins folder. OpenRGB tries to load everything i
 You need:
 
 - Visual Studio Build Tools 2019 or 2022 with the C++ desktop workload
-- Qt 5.15.2 (`msvc2019_64`)
+- Qt 6.8.3 (`msvc2022_64`), for OpenRGB 1.1 (plugin API 5)
 - CMake 3.16 or newer (the one that comes with Visual Studio is fine)
-- hidapi and libusb, for example `vcpkg install hidapi:x64-windows libusb:x64-windows`, or folders that have `include/` and `lib/`
+- hidapi and libusb: the bundled `third_party/hidapi/lib/hidapi.lib` imports OpenRGB 1.1's own `hidapi-hotplug.dll` (regenerate with `lib /def:hidapi.def /machine:x64`); libusb from `third_party/libusb` or vcpkg
 - [lhwm-wrapper](https://github.com/LeProta/lhwm-wrapper) cloned next to this repository
 
 The OpenRGB plugin interface is already in `src/NZXTKrakenLCDPlugin.h`, so you do not need the OpenRGB sources.
@@ -65,7 +65,7 @@ git clone https://github.com/LeProta/NZXTKrakenLCDPlugin
 cd NZXTKrakenLCDPlugin
 
 cmake -S . -B build -G "NMake Makefiles" ^
-  -DCMAKE_PREFIX_PATH=C:/Qt/5.15.2/msvc2019_64 ^
+  -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/msvc2022_64 ^
   -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake
 
 cmake --build build
@@ -104,4 +104,4 @@ The [pump plugin](https://github.com/LeProta/NZXTKrakenPumpPlugin) controls the 
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Qt, hidapi, libusb and LibreHardwareMonitor keep their own licenses.
+MIT, see [LICENSE](LICENSE). Qt, hidapi, libusb and LibreHardwareMonitor keep their own licenses. The OpenRGB 1.1 plugin API headers in `third_party/openrgb` are GPL-2.0-or-later (see `third_party/openrgb/LICENSE`); `nlohmann/json.hpp` is MIT.

@@ -12,11 +12,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
-if(NOT DEFINED CMAKE_PREFIX_PATH AND NOT DEFINED Qt5_DIR AND NOT DEFINED ENV{CMAKE_PREFIX_PATH}
-   AND EXISTS "C:/Qt/5.15.2/msvc2019_64")
-    set(CMAKE_PREFIX_PATH "C:/Qt/5.15.2/msvc2019_64")
+if(NOT DEFINED CMAKE_PREFIX_PATH AND NOT DEFINED Qt6_DIR AND NOT DEFINED ENV{CMAKE_PREFIX_PATH}
+   AND EXISTS "C:/Qt/6.8.3/msvc2022_64")
+    set(CMAKE_PREFIX_PATH "C:/Qt/6.8.3/msvc2022_64")
 endif()
-find_package(Qt5 5.15 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets)
 
 foreach(_dep hidapi libusb)
     string(TOUPPER ${_dep} _DEP)
@@ -49,12 +49,13 @@ get_filename_component(LHWM_WRAPPER_DIR "${LHWM_WRAPPER_DIR}" ABSOLUTE)
 file(GLOB_RECURSE PLUGIN_SOURCES CONFIGURE_DEPENDS src/*.cpp src/*.h)
 add_library(NZXTKrakenLCDPlugin SHARED ${PLUGIN_SOURCES})
 target_include_directories(NZXTKrakenLCDPlugin PRIVATE src
+    third_party/openrgb  # OpenRGB 1.1 plugin API headers
     ${HIDAPI_INCLUDE_DIR} ${LIBUSB_INCLUDE_DIR} ${LHWM_WRAPPER_DIR})
 target_compile_options(NZXTKrakenLCDPlugin PRIVATE /EHa /utf-8 /bigobj /W3)
 target_compile_definitions(NZXTKrakenLCDPlugin PRIVATE NOMINMAX _USE_MATH_DEFINES
     _SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING)
 target_link_libraries(NZXTKrakenLCDPlugin PRIVATE
-    Qt5::Core Qt5::Gui Qt5::Widgets
+    Qt6::Core Qt6::Gui Qt6::Widgets
     ${HIDAPI_LIBRARY} ${LIBUSB_LIBRARY}
     "${LHWM_WRAPPER_DIR}/x64/Release/lhwm-cpp-wrapper.lib"
     hid setupapi winhttp ole32 windowsapp)

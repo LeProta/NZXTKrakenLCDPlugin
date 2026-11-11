@@ -1,2 +1,5 @@
 /build*/
-/third_party/
+/third_party/*
+# Versioned: OpenRGB 1.1 plugin API headers, hidapi header + import lib for OpenRGB's hidapi-hotplug.dll
+!/third_party/openrgb/
+!/third_party/hidapi/

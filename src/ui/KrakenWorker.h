@@ -59,6 +59,8 @@ private:
     int           m_sendFailCount  = 0;
     int           m_reopenDelayMs  = 3000;
     QElapsedTimer m_reopenClock;
+    size_t        m_lastPayloadHash = 0;   // last frame sent, 0 = force next send
+    QElapsedTimer m_lastSendClock;
 
     QMutex      m_cfgMutex;
     FrameConfig m_cfg;

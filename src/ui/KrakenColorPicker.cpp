@@ -336,7 +336,7 @@ CustomColorPicker::CustomColorPicker(QWidget* parent) : QWidget(parent) {
 void CustomColorPicker::setColor(const QColor& c) { if (!c.isValid()) return; m_color = c; syncInputsFromColor(); }
 void CustomColorPicker::emitColor(const QColor& c) { m_color = c; syncInputsFromColor(); emit colorChanged(c); }
 void CustomColorPicker::syncInputsFromColor() {
-    m_updating = true; qreal h, s, v; m_color.getHsvF(&h, &s, &v); if (h < 0) h = 0;
+    m_updating = true; float h, s, v; m_color.getHsvF(&h, &s, &v); if (h < 0) h = 0;
     m_hueSlider->setHue(h * 360.f); m_sv->setHue(h * 360.f); m_sv->setSV(s, v);
     {
         const bool bgr = (OpenRGBSettings::hexFormat() == QLatin1String("BGR"));
@@ -449,7 +449,7 @@ static QWidget* makeHistoryBar(QWidget* parent, const QList<QColor>& history, st
         lay->addStretch();
         container->setMinimumHeight(44);
     } else {
-        int n = std::min(history.size(), 8);
+        int n = std::min<int>(history.size(), 8);
         for (int i = 0; i < n; ++i) {
             auto* b = new ColorSwatchButton;
             b->setProperty("popoverStyle", true);
@@ -481,7 +481,7 @@ static QWidget* makeGradientHistoryBar(QWidget* parent, const QList<GradientStop
         emptyLbl->setAlignment(Qt::AlignCenter); lay->addWidget(emptyLbl); lay->addStretch();
         container->setMinimumHeight(44);
     } else {
-        int n = std::min(history.size(), 8);
+        int n = std::min<int>(history.size(), 8);
         for (int i = 0; i < n; ++i) {
             auto* b = new ColorSwatchButton;
             b->setProperty("popoverStyle", true);

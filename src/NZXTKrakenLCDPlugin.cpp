@@ -1,6 +1,7 @@
 #include "NZXTKrakenLCDPlugin.h"
 #include "Version.h"
 #include "ui/KrakenLCDWidget.h"
+#include "ui/KrakenOpenRGBSettings.h"
 #include <QPainter>
 #include <QFont>
 #include <QDir>
@@ -34,33 +35,11 @@ bool             g_pinnedInChain  = false;
 bool             g_fileEnabled    = true;
 bool             g_consoleEnabled = false;
 int              g_logLevel       = KL_INFO;
-int              g_fileCountLimit = 0;
+int              g_fileCountLimit = 10;   // OpenRGB 1.1 LogManager default
 
-QString openRGBConfigDir()
+void loadOpenRGBLogSettings()
 {
-    const QString exeDir = QCoreApplication::applicationDirPath();
-    if (QFileInfo::exists(exeDir + QStringLiteral("/OpenRGB.json")))
-        return exeDir;
-
-    const QString appdata = qEnvironmentVariable("APPDATA");
-    if (!appdata.isEmpty())
-        return appdata + QStringLiteral("/OpenRGB");
-
-    return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
-           + QStringLiteral("/OpenRGB");
-}
-
-void loadOpenRGBLogSettings(const QString& cfgDir)
-{
-    QFile f(cfgDir + QStringLiteral("/OpenRGB.json"));
-    if (!f.open(QIODevice::ReadOnly))
-        return;
-
-    const QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
-    if (!doc.isObject())
-        return;
-
-    const QJsonObject lm = doc.object().value(QStringLiteral("LogManager")).toObject();
+    const QJsonObject lm = NZXTKraken::OpenRGBSettings::section(QStringLiteral("LogManager"));
     if (lm.contains(QStringLiteral("log_file")))
         g_fileEnabled = lm.value(QStringLiteral("log_file")).toBool(g_fileEnabled);
     if (lm.contains(QStringLiteral("log_console")))
@@ -166,8 +145,8 @@ void installKrakenLogger(const QString& hidVer)
     g_installed = true;
     g_clock.start();
 
-    const QString cfgDir = openRGBConfigDir();
-    loadOpenRGBLogSettings(cfgDir);
+    const QString cfgDir = NZXTKraken::OpenRGBSettings::configDir();
+    loadOpenRGBLogSettings();
 
     const QString stamp = QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_HHmmss"));
 
@@ -240,6 +219,7 @@ OpenRGBPluginInfo NZXTKrakenLCDPlugin::GetPluginInfo()
     info.Location    = OPENRGB_PLUGIN_LOCATION_TOP;
     info.Label       = "NZXT Kraken LCD";
     info.TabIconString = "";
+    info.ProtocolVersion = 0;   // no SDK commands
 
     QImage icon(64, 64, QImage::Format_ARGB32);
     icon.fill(Qt::black);
@@ -263,14 +243,15 @@ OpenRGBPluginInfo NZXTKrakenLCDPlugin::GetPluginInfo()
 
 unsigned int NZXTKrakenLCDPlugin::GetPluginAPIVersion()
 {
-    return OPENRGB_PLUGIN_API_VERSION;  // 4
+    return OPENRGB_PLUGIN_API_VERSION;
 }
 
-void NZXTKrakenLCDPlugin::Load(ResourceManagerInterface* /*rm*/)
+void NZXTKrakenLCDPlugin::Load(OpenRGBPluginAPIInterface* rm)
 {
     const struct hid_api_version* v = hid_version();
     const QString hidVer = v ? QString("%1.%2.%3").arg(v->major).arg(v->minor).arg(v->patch)
                              : QStringLiteral("(unknown)");
+    NZXTKraken::OpenRGBSettings::init(rm);
     installKrakenLogger(hidVer);
 
     qInfo() << "[KrakenLCD/Core] Plugin loaded.";
@@ -288,7 +269,7 @@ void NZXTKrakenLCDPlugin::Load(ResourceManagerInterface* /*rm*/)
 #endif
 
     if (!m_widget)
-        m_widget = new NZXTKraken::KrakenLCDWidget;
+        m_widget = new NZXTKraken::KrakenLCDWidget(rm);
 }
 
 QWidget* NZXTKrakenLCDPlugin::GetWidget()
@@ -313,6 +294,11 @@ QWidget* NZXTKrakenLCDPlugin::GetWidget()
 QMenu* NZXTKrakenLCDPlugin::GetTrayMenu()
 {
     return nullptr;
+}
+
+void NZXTKrakenLCDPlugin::SettingsManagerUpdated(unsigned int)
+{
+    NZXTKraken::OpenRGBSettings::refresh();
 }
 
 void NZXTKrakenLCDPlugin::Unload()

@@ -52,6 +52,7 @@ FrameConfig KrakenWorker::currentConfig()
 bool KrakenWorker::tryOpenDevice()
 {
     if (!m_device->open()) return false;
+    m_lastPayloadHash = 0;   // a reopened device shows nothing until the next frame
     const FrameConfig cfg = currentConfig();
     m_device->setBrightness(cfg.brightness);
     emit deviceOpened(QString::fromStdString(m_device->deviceName()), true);
@@ -136,10 +137,9 @@ void KrakenWorker::applyCadence()
     const int screenMs = std::max(1, 1000 / devFps);
 
     int interval;
-    if (cfg.mode == DisplayMode::AUDIO_VISUAL) interval = screenMs;
-    else if (modeUsesMedia(cfg)
-             || cfg.mode == DisplayMode::NOW_PLAYING
-             || cfg.mode == DisplayMode::CLOCKFACE) interval = screenMs;
+    if (cfg.mode == DisplayMode::AUDIO_VISUAL || modeUsesMedia(cfg)) interval = screenMs;
+    else if (cfg.mode == DisplayMode::NOW_PLAYING
+             || cfg.mode == DisplayMode::CLOCKFACE) interval = std::max(screenMs, 33);  // 30 fps is smooth enough
     else                                       interval = std::max(screenMs, 200);
 
     m_renderTimer->setInterval(interval);
@@ -184,8 +184,16 @@ void KrakenWorker::renderTick()
                            ? FrameRenderer::toQ565(target)
                            : FrameRenderer::toJpeg(target, 90);
 
-        if (m_device->sendFrame(payload)) {
+        // Unchanged frame (static image, infographic between sensor ticks): resend once per second only.
+        const size_t hash = qHash(payload);
+        if (hash == m_lastPayloadHash && m_lastSendClock.isValid() && m_lastSendClock.elapsed() < 1000)
+            return;
+
+        const bool sent   = m_device->sendFrame(payload);
+        m_lastPayloadHash = sent ? hash : 0;
+        if (sent) {
             m_sendFailCount = 0;
+            m_lastSendClock.restart();
         } else if (++m_sendFailCount >= 3) {
             m_sendFailCount = 0;
             m_device->close();

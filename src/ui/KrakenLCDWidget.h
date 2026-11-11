@@ -15,6 +15,7 @@
 #include "KrakenColorPicker.h"
 
 class QThread;
+class OpenRGBPluginAPIInterface;
 
 namespace NZXTKraken {
 
@@ -34,7 +35,7 @@ private:
 class KrakenLCDWidget : public QWidget {
     Q_OBJECT
 public:
-    explicit KrakenLCDWidget(QWidget* parent = nullptr);
+    explicit KrakenLCDWidget(OpenRGBPluginAPIInterface* rm = nullptr, QWidget* parent = nullptr);
     ~KrakenLCDWidget();
     void setDarkTheme(bool dark);
 
@@ -46,6 +47,10 @@ private slots:
     void onRotateClicked();
 
 private:
+    void reapplyOpenRGBLighting();
+    OpenRGBPluginAPIInterface* m_rm = nullptr;
+    QTimer*                    m_rgbTimer = nullptr;
+
     void buildUI();
     void buildModeSelector();
     void buildMediaContainer();

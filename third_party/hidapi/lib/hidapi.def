@@ -1,0 +1,27 @@
+LIBRARY hidapi-hotplug.dll
+EXPORTS
+hid_close
+hid_enumerate
+hid_error
+hid_exit
+hid_free_enumeration
+hid_get_device_info
+hid_get_feature_report
+hid_get_indexed_string
+hid_get_input_report
+hid_get_manufacturer_string
+hid_get_product_string
+hid_get_report_descriptor
+hid_get_serial_number_string
+hid_init
+hid_open
+hid_open_path
+hid_read
+hid_read_timeout
+hid_send_feature_report
+hid_set_nonblocking
+hid_version
+hid_version_str
+hid_winapi_descriptor_reconstruct_pp_data
+hid_winapi_get_container_id
+hid_write

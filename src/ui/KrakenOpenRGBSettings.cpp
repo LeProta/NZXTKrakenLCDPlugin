@@ -1,38 +1,49 @@
 #include "KrakenOpenRGBSettings.h"
-#include <QFile>
-#include <QFileInfo>
-#include <QStandardPaths>
-#include <QCoreApplication>
+#include "OpenRGBPluginInterface.h"
 #include <QJsonDocument>
-#include <QJsonObject>
 #include <QLocale>
+#include <QMutex>
 
 namespace NZXTKraken {
 namespace OpenRGBSettings {
 
+static OpenRGBPluginAPIInterface* g_api = nullptr;
+static QMutex                     g_mutex;
+static QJsonObject                g_ui;   // cached "UserInterface" section
+
+void init(OpenRGBPluginAPIInterface* api)
+{
+    g_api = api;
+    refresh();
+}
+
+void refresh()
+{
+    const QJsonObject ui = section(QStringLiteral("UserInterface"));
+    QMutexLocker lk(&g_mutex);
+    g_ui = ui;
+}
+
+QJsonObject section(const QString& key)
+{
+    if (!g_api) return {};
+    const std::string json = g_api->GetSettings(key.toStdString()).dump();
+    return QJsonDocument::fromJson(QByteArray::fromStdString(json)).object();
+}
+
 QString configDir()
 {
-    const QString exeDir = QCoreApplication::applicationDirPath();
-    if (QFileInfo::exists(exeDir + QStringLiteral("/OpenRGB.json")))
-        return exeDir;
-
-    const QString appdata = qEnvironmentVariable("APPDATA");
-    if (!appdata.isEmpty())
-        return appdata + QStringLiteral("/OpenRGB");
-
-    return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
-           + QStringLiteral("/OpenRGB");
+    if (!g_api)
+        return qEnvironmentVariable("APPDATA") + QStringLiteral("/OpenRGB");
+    QString dir = QString::fromStdString(g_api->GetConfigurationDirectory().generic_u8string());
+    while (dir.endsWith(QLatin1Char('/'))) dir.chop(1);
+    return dir;
 }
 
 static QJsonObject userInterfaceSection()
 {
-    QFile f(configDir() + QStringLiteral("/OpenRGB.json"));
-    if (!f.open(QIODevice::ReadOnly))
-        return {};
-    const QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
-    if (!doc.isObject())
-        return {};
-    return doc.object().value(QStringLiteral("UserInterface")).toObject();
+    QMutexLocker lk(&g_mutex);
+    return g_ui;
 }
 
 QString language()
@@ -64,7 +75,7 @@ bool prefersFahrenheit()
     if (!systemDefault)
         return false;
 
-    switch (QLocale::system().country()) {
+    switch (QLocale::system().territory()) {
         case QLocale::UnitedStates:
         case QLocale::Bahamas:
         case QLocale::Belize:

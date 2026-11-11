@@ -23,6 +23,7 @@
 #include <QPalette>
 #include <QPointer>
 #include <QEvent>
+#include "OpenRGBPluginInterface.h"
 
 namespace NZXTKraken {
 
@@ -331,7 +332,40 @@ void KrakenLCDWidget::saveConfig()
     if (m_saveTimer) m_saveTimer->start();
 }
 
-KrakenLCDWidget::KrakenLCDWidget(QWidget* parent) : QWidget(parent)
+static bool isKrakenController(RGBControllerInterface* c)
+{
+    const QString loc = QString::fromStdString(c->GetLocation());
+    for (const auto& dev : SUPPORTED_DEVICES)
+        if (loc.contains(QString::asprintf("VID_%04X&PID_%04X", dev.vid, dev.pid),
+                         Qt::CaseInsensitive))
+            return true;
+    return false;
+}
+
+// OpenRGB writes the Kraken ring colors only once (profile load, which at boot races with
+// this plugin opening the device), so a lost packet leaves LEDs dark. SignalRGB instead
+// re-sends every frame: do the same with OpenRGB's own colors, every 2 s.
+void KrakenLCDWidget::reapplyOpenRGBLighting()
+{
+    // Detection (startup, rescan, 1.1 hotplug) creates/deletes controllers: wait for it.
+    // shortcut: a Kraken unplugged during this loop can still race, guard via ResourceManagerUpdated if it ever crashes.
+    if (!m_rm || m_rm->GetDetectionPercent() < 100) return;
+    for (RGBControllerInterface* c : m_rm->GetRGBControllers()) {
+        if (!c || !isKrakenController(c)) continue;
+        const int mode = c->GetActiveMode();
+        if (mode < 0 || unsigned(mode) >= c->GetModeCount()
+            || c->GetModeColorMode(mode) != MODE_COLORS_PER_LED)
+            continue;   // hardware effect: re-sending would restart its animation
+        bool anyLit = false;
+        for (unsigned i = 0; i < c->GetLEDCount() && !anyLit; ++i) anyLit = c->GetColor(i) != 0;
+        if (!anyLit)
+            continue;   // no profile loaded yet: keep whatever the AIO shows
+        c->UpdateMode();
+    }
+}
+
+KrakenLCDWidget::KrakenLCDWidget(OpenRGBPluginAPIInterface* rm, QWidget* parent)
+    : QWidget(parent), m_rm(rm)
 {
 
     m_config = KrakenUiPersistence::load();
@@ -379,6 +413,12 @@ KrakenLCDWidget::KrakenLCDWidget(QWidget* parent) : QWidget(parent)
             [this](const QString& name, bool ok) {
                 m_lblDeviceName->setText(name);
                 if (!ok) m_lblStatus->setText("Check the USB connection and close NZXT CAM.");
+                if (ok && !m_rgbTimer) {
+                    m_rgbTimer = new QTimer(this);
+                    connect(m_rgbTimer, &QTimer::timeout, this,
+                            &KrakenLCDWidget::reapplyOpenRGBLighting);
+                    m_rgbTimer->start(2000);
+                }
             });
     connect(m_worker, &KrakenWorker::deviceStatus, this,
             [this](const QString& t) { if (m_lblStatus) m_lblStatus->setText(t); });

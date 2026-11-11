@@ -25,8 +25,11 @@ foreach(_dep hidapi libusb)
     endif()
 endforeach()
 
-find_path(HIDAPI_INCLUDE_DIR hidapi/hidapi.h HINTS ${HIDAPI_ROOT} PATH_SUFFIXES include)
-find_library(HIDAPI_LIBRARY NAMES hidapi HINTS ${HIDAPI_ROOT} PATH_SUFFIXES lib)
+# HINTS before vcpkg/CMAKE_PREFIX_PATH: a vcpkg hidapi links hidapi.dll, which OpenRGB 1.1 does not ship.
+find_path(HIDAPI_INCLUDE_DIR hidapi/hidapi.h HINTS ${HIDAPI_ROOT} PATH_SUFFIXES include
+          NO_CMAKE_PATH NO_CMAKE_ENVIRONMENT_PATH)
+find_library(HIDAPI_LIBRARY NAMES hidapi HINTS ${HIDAPI_ROOT} PATH_SUFFIXES lib
+             NO_CMAKE_PATH NO_CMAKE_ENVIRONMENT_PATH)
 find_path(LIBUSB_INCLUDE_DIR libusb-1.0/libusb.h HINTS ${LIBUSB_ROOT} PATH_SUFFIXES include)
 find_library(LIBUSB_LIBRARY NAMES libusb-1.0 usb-1.0 HINTS ${LIBUSB_ROOT} PATH_SUFFIXES lib)
 if(NOT HIDAPI_INCLUDE_DIR OR NOT HIDAPI_LIBRARY OR NOT LIBUSB_INCLUDE_DIR OR NOT LIBUSB_LIBRARY)
